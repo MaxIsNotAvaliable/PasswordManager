@@ -1,5 +1,6 @@
 #include "renderGui.h"
-#include <render/drawing.h>
+//#include <render/drawing.h>
+#include "drawing.h"
 
 #include <files_helper/files.h>
 
@@ -13,24 +14,78 @@ static int nextTabId = currentTabId;
 
 static Animation contentAnim = Animation(Animation::forward, 0.25f);
 
+template<typename T>
+class MoveFrameForward
+{
+private:
+	T m_value;
+	int m_frameId = 0;
+
+public:
+	void Set(const T& value)
+	{
+		if (m_value != value)
+		{
+			m_frameId = 0;
+			m_value = value;
+		}
+	};
+
+	T Get(int frameId = 0)
+	{
+		m_frameId++;
+		if (m_frameId - 1 < frameId)
+			return T();
+		return m_value;
+	};
+};
+
 void RenderGUI::RenderBody(const HWND& window)
 {
-	ImGuiStyle* style = &ImGui::GetStyle();
-	ImGuiIO* io = &ImGui::GetIO();
+	//static MoveFrameForward<bool> mff;
+	//if (mff.Get(3) == true)
+	//	mff.Set(false);
+	//else
+	//	mff.Set(true);
 
-	show_animation.Proceed();
+
+	animation_show.Proceed();
+	animation_maximize.Proceed();
 
 	contentAnim.Proceed();
 	if (contentAnim.StartAfter(contentAnim, Animation::back, Animation::forward))
 		currentTabId = nextTabId;
 
-	ImVec2 windowPos = ImVec2(margin, margin);
-	ImVec2 windowSize = size - ImVec2(margin, margin) * 2;
-	float animationValue = show_animation.GetValueSin();
+	ImGuiStyle* style = &ImGui::GetStyle();
+	ImGuiIO* io = &ImGui::GetIO();
+
+	float maximizeValue = animation_maximize.GetValueSin();
+
+	float maximizeClamp101 = (maximizeValue - 0.5f) * 2;
+	//margin = lerpf(20, 0, maximizeValue);
+	//style->WindowRounding = margin / 5;
+
+	ImVec2 hWndPosOverride = ImLerp(ImVec2(RenderGUI::windowPosX, RenderGUI::windowPosY), ImVec2(0, 0), maximizeValue);
+	ImVec2 hWndSizeOverride = ImLerp(ImVec2(RenderGUI::GetFullWidth(), RenderGUI::GetFullHeight()), ImVec2(1920, 1080), maximizeValue);
+
+	//ImVec2 windowPos = ImLerp(ImVec2(margin, margin), ImVec2(0, 0), maximizeValue);
+	//ImVec2 windowSize = ImLerp(ImVec2(windowWidth, windowHeight), ImVec2(1920, 1080), maximizeValue);
+
+	/*
+	static int runCount = 0;
+
+	runCount += animation_maximize.IsRunning() ? 1 : -1;
+	runCount = clampf(0, 2, runCount);
+	*/
+
+	ImVec2 windowPos = ImLerp(animation_maximize.IsRunning() ? ImVec2(windowPosX, windowPosY) : ImVec2(margin, margin), ImVec2(0, 0), maximizeValue);
+	ImVec2 windowSize = ImLerp(ImVec2(windowWidth, windowHeight), hWndSizeOverride, maximizeValue);
+
+	float animationValue = animation_show.GetValueSin();
 	float alpha = Animation::lerp(0, 0.98f, animationValue);
 
-	ImGui::SetNextWindowSize(windowSize);
 	ImGui::SetNextWindowPos(windowPos);
+	ImGui::SetNextWindowSize(windowSize);
 	ImGui::SetNextWindowBgAlpha(alpha);
 	ImGui::PushStyleVar(ImGuiStyleVar_Alpha, animationValue);
 
@@ -53,34 +108,78 @@ void RenderGUI::RenderBody(const HWND& window)
 			ImGui::Text("Password manager");
 			ImGui::SameLine();
 
-			ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - titleBtnWidth * 2 - style->ItemSpacing.x);
+			constexpr float titleBarBtnCount = 3;
+
+			ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - titleBtnWidth * titleBarBtnCount - style->ItemSpacing.x * maxf(titleBarBtnCount - 1, 1));
 			ImVec2 HidePos = tools::LocalToGlobalPos(ImGui::GetCursorPos());
-			ImVec2 CrossPos = HidePos + ImVec2(titleBtnWidth + style->ItemSpacing.x, 0);
+			ImVec2 MaximizePos = HidePos + ImVec2(titleBtnWidth + style->ItemSpacing.x, 0);
+			ImVec2 CrossPos = MaximizePos + ImVec2(titleBtnWidth + style->ItemSpacing.x, 0);
 
 			if (items::ShadowButton("##minimizeBtn", titleBtnSize))
 			{
-				show_animation.Start(Animation::back);
+				animation_show.Start(Animation::back);
 			}
-
 			ImGui::SameLine();
+
+			MaximizePos = tools::LocalToGlobalPos(ImGui::GetCursorPos());
+			static MoveFrameForward<bool> isGoingToBig;
+			if (items::ShadowButton("##maximizeBtn", titleBtnSize) && animation_maximize.AnimationEnded())
+			{
+				animation_maximize.Start();
+				isGoingToBig.Set(animation_maximize.GetState() != Animation::back);
+
+				//ImVec2 posOverride = ImLerp(ImVec2(RenderGUI::windowPosX, RenderGUI::windowPosY), ImVec2(0, 0), animation_maximize.GetState() != Animation::State::back);
+				//ImVec2 sizeOverride = ImLerp(ImVec2(RenderGUI::GetFullWidth(), RenderGUI::GetFullHeight()), ImVec2(1920, 1080), animation_maximize.GetState() != Animation::State::back);
+				//
+				//SetWindowPos(window, NULL,
+				//	posOverride.x, posOverride.y,
+				//	sizeOverride.x, sizeOverride.y,
+				//	SWP_SHOWWINDOW | SWP_NOZORDER);
+			}
+			ImGui::SameLine();
+
+			CrossPos = tools::LocalToGlobalPos(ImGui::GetCursorPos());
 			if (items::ShadowButton("##closeBtn", titleBtnSize))
 			{
-				show_animation.Start(Animation::back);
+				animation_show.Start(Animation::back);
 				running = false;
 			}
 
 			draw::Underline(ImVec2(HidePos.x + titleBtnWidth / 2, HidePos.y + titleBtnWidth / 2), titleBtnPd, colors::text);
-			draw::Cross(ImVec2(CrossPos.x + titleBtnWidth / 2, CrossPos.y + titleBtnWidth / 2), titleBtnPd * show_animation.GetValueSin(), colors::text);
+			draw::CornersMarks(ImVec2(MaximizePos.x + titleBtnWidth / 2, MaximizePos.y + titleBtnWidth / 2), titleBtnPd, -1 * maximizeClamp101, colors::text);
+			draw::Cross(ImVec2(CrossPos.x + titleBtnWidth / 2, CrossPos.y + titleBtnWidth / 2), titleBtnPd * animation_show.GetValueSin(), colors::text);
+
+			static bool lastTick = animation_maximize.IsRunning();
+			if (animation_maximize.IsRunning() || lastTick)
+			{
+				//SetWindowPos(window, NULL,
+				//	hWndPosOverride.x, hWndPosOverride.y,
+				//	hWndSizeOverride.x, hWndSizeOverride.y,
+				//	SWP_SHOWWINDOW | SWP_NOZORDER);
+			}
+			if (animation_maximize.AnimationEnded() && lastTick || isGoingToBig.Get(1))
+			{
+				ImVec2 posOverride = ImLerp(ImVec2(RenderGUI::windowPosX, RenderGUI::windowPosY), ImVec2(0, 0), animation_maximize.GetState() != Animation::State::back);
+				ImVec2 sizeOverride = ImLerp(ImVec2(RenderGUI::GetFullWidth(), RenderGUI::GetFullHeight()), ImVec2(1920, 1080), animation_maximize.GetState() != Animation::State::back);
+
+				SetWindowPos(window, NULL,
+					posOverride.x, posOverride.y,
+					sizeOverride.x, sizeOverride.y,
+					SWP_SHOWWINDOW | SWP_NOZORDER);
+			}
+			lastTick = animation_maximize.IsRunning();
+			ImGui::Text("%.3f", RenderGUI::animation_maximize.GetValue());
 		}
 
 
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, colors::background * colors::darker);
 
+		ImVec2 wndSize = ImGui::GetWindowSize();
 		ImVec2 loginChildSize = ImVec2(340, 230);
-		ImVec2 deltaPos = windowSize - loginChildSize + style->WindowPadding;
-		
-		ImGui::SetNextWindowPos(ImVec2(deltaPos.x / 2, deltaPos.y / 2));
+		ImVec2 deltaPos = wndSize - loginChildSize + style->WindowPadding;
+
+		ImGui::SetNextWindowPos(windowPos + ImVec2(deltaPos.x / 2, deltaPos.y / 2));
 		ImGui::BeginChild("LoginChild", loginChildSize, 0, ImGuiWindowFlags_AlwaysUseWindowPadding);
 		{
 			ImGui::Text("Enter your encryption key");
@@ -88,8 +187,17 @@ void RenderGUI::RenderBody(const HWND& window)
 
 			static char szKeyBuffer[MAX_PATH] = { '\0' };
 			ImGui::InputText("##input_encryption_key", szKeyBuffer, sizeof(szKeyBuffer) / sizeof(*szKeyBuffer));
+			//ImGui::SameLine();
+
+			if (ImGui::Button("Decrypt"))
+			{
+
+			}
 			ImGui::SameLine();
-			ImGui::Button("Decrypt");
+			if (ImGui::Button("Encrypt"))
+			{
+
+			}
 
 			ImGui::NewLine();
 			ImGui::Button("Key lost");
@@ -123,6 +231,7 @@ void RenderGUI::RenderEffects()
 void RenderGUI::SetupStyle()
 {
 	ImGuiStyle* style = &ImGui::GetStyle();
+
 	style->WindowRounding = 4;
 	style->WindowBorderSize = 0;
 	style->WindowShadowSize = margin;
@@ -188,6 +297,21 @@ void RenderGUI::InitializeImGui()
 	//fonts::bold_28 = io->Fonts->AddFontFromMemoryTTF(ttf_bytes_inter_bold, sizeof(ttf_bytes_inter_bold), 28.f, &fontConfig);
 }
 
+ImVec2 RenderGUI::GetFullSize()
+{
+	return ImVec2(GetFullWidth(), GetFullHeight());
+}
+
+int RenderGUI::GetFullWidth()
+{
+	return RenderGUI::windowWidth + RenderGUI::margin * 2;
+}
+
+int RenderGUI::GetFullHeight()
+{
+	return RenderGUI::windowHeight + RenderGUI::margin * 2;
+}
+
 bool RenderGUI::Initialize(const HWND& window, const WNDCLASSEXA& wc, const int& cmd_show)
 {
 	DXGI_SWAP_CHAIN_DESC sd{};
@@ -207,10 +331,6 @@ bool RenderGUI::Initialize(const HWND& window, const WNDCLASSEXA& wc, const int&
 		D3D_FEATURE_LEVEL_10_0,
 	};
 
-	ID3D11Device* pDevice{ nullptr };
-	ID3D11DeviceContext* pContext{ nullptr };
-	IDXGISwapChain* pSwap_chain{ nullptr };
-	ID3D11RenderTargetView* pTarget_view{ nullptr };
 	D3D_FEATURE_LEVEL level{};
 
 	HRESULT hrCreateDevice = D3D11CreateDeviceAndSwapChain(
@@ -259,10 +379,12 @@ bool RenderGUI::Initialize(const HWND& window, const WNDCLASSEXA& wc, const int&
 	ImGui_ImplWin32_Init(window);
 	ImGui_ImplDX11_Init(pDevice, pContext);
 
-	bool inCycle = running || !show_animation.AnimationEnded(Animation::back);
+	initialized = true;
+
+	bool inCycle = running || !animation_show.AnimationEnded(Animation::back);
 	while (inCycle)
 	{
-		inCycle = running || !show_animation.AnimationEnded(Animation::back);
+		inCycle = running || !animation_show.AnimationEnded(Animation::back);
 		MSG msg;
 		while (PeekMessageA(&msg, nullptr, 0U, 0U, PM_REMOVE))
 		{
@@ -283,6 +405,14 @@ bool RenderGUI::Initialize(const HWND& window, const WNDCLASSEXA& wc, const int&
 
 		RenderBody(window);
 
+		ImGuiIO& io = ImGui::GetIO();
+		float maximizeValue = animation_maximize.GetValueSin();
+		ImVec2 newSize = ImLerp(ImVec2(RenderGUI::GetFullWidth(), RenderGUI::GetFullHeight()), ImVec2(1920, 1080), maximizeValue);
+		io.DisplaySize.x = newSize.x;
+		io.DisplaySize.y = newSize.y;
+
+
+
 		ImGui::Render();
 		constexpr float color[4]{ 0.f, 0.f, 0.f, 0.f };
 		pContext->OMSetRenderTargets(1U, &pTarget_view, nullptr);
@@ -297,7 +427,7 @@ bool RenderGUI::Initialize(const HWND& window, const WNDCLASSEXA& wc, const int&
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
 
-	auto ReleaseDx = [&pSwap_chain, &pDevice, &pContext, &pTarget_view]() {
+	auto ReleaseDx = []() {
 		if (pSwap_chain)	pSwap_chain->Release();
 		if (pDevice)		pDevice->Release();
 		if (pContext)		pContext->Release();
@@ -315,5 +445,34 @@ bool RenderGUI::Initialize(const HWND& window, const WNDCLASSEXA& wc, const int&
 bool RenderGUI::Running()
 {
 	return running;
+}
+
+void RenderGUI::ResizeRenderTarget()
+{
+	if (!initialized) return;
+	if (pTarget_view) {
+		pTarget_view->Release();
+		pTarget_view = nullptr;
+	}
+
+	// Resize the swap chain
+	pSwap_chain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0);
+
+	// Create a new render target view
+	ID3D11Texture2D* pBackBuffer = nullptr;
+	pSwap_chain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
+	pDevice->CreateRenderTargetView(pBackBuffer, nullptr, &pTarget_view);
+	pBackBuffer->Release();
+
+	// Update viewport dimensions
+	D3D11_VIEWPORT vp;
+	vp.Width = static_cast<float>(windowWidth);
+	vp.Height = static_cast<float>(windowHeight);
+	vp.MinDepth = 0.0f;
+	vp.MaxDepth = 1.0f;
+	vp.TopLeftX = 0;
+	vp.TopLeftY = 0;
+	pContext->RSSetViewports(1, &vp);
+
 }
 

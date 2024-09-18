@@ -114,6 +114,34 @@ namespace draw
 		window->DrawList->AddLine(center - size, center + size, col, LINE_WIDTH);
 	}
 
+	static void CornersMarks(ImVec2 center, float space, float direction = -1, ImVec4 color = colors::white)
+	{
+		ImGuiWindow* window = ImGui::GetCurrentWindow();
+		if (window->SkipItems)
+			return;
+
+		direction = clampf(-1, 1, direction);
+		//space *= direction;
+		float spaceDir = space * (direction * 0.7f + 0.3f);
+
+		ImU32 col = ImGui::GetColorU32(color);
+		ImVec2 p1 = ImVec2(center.x - spaceDir, center.y + spaceDir);
+		ImVec2 p2 = ImVec2(center.x + spaceDir, center.y - spaceDir);
+
+		//ImRect rect = ImRect{ ImVec2(center.x - space, center.y - space) , ImVec2(center.x + space, center.y + space) };
+
+		ImVec2 points1[3] = { p1 + ImVec2(space, 0), p1, p1 - ImVec2(0, space) };
+		ImVec2 points2[3] = { p2 - ImVec2(space, 0), p2, p2 + ImVec2(0, space) };
+
+		window->DrawList->AddPolyline(points1, 3, col, NULL, LINE_WIDTH);
+		window->DrawList->AddPolyline(points2, 3, col, NULL, LINE_WIDTH);
+		//window->DrawList->AddLine(p1, p1 - ImVec2(0, space), col, LINE_WIDTH);
+		//window->DrawList->AddLine(p1, p1 + ImVec2(space, 0), col, LINE_WIDTH);
+		//window->DrawList->AddLine(p2, p2 + ImVec2(0, space), col, LINE_WIDTH);
+		//window->DrawList->AddLine(p2, p2 - ImVec2(space, 0), col, LINE_WIDTH);
+	}
+
+
 	static void Pie(ImVec2 center, float value, float radius = 50, const char* extraText = 0)
 	{
 		ImGuiWindow* window = ImGui::GetCurrentWindow();
@@ -335,7 +363,7 @@ namespace items
 		ImGui::OpenPopup(title);
 	}
 
-	bool ShowNotify(const char* title, const char* label, bool *outResult = nullptr)
+	bool ShowNotify(const char* title, const char* label, bool* outResult = nullptr)
 	{
 		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
 		ImGui::SetNextWindowPos(center, 0, ImVec2(0.5f, 0.5f));
@@ -569,7 +597,7 @@ namespace vertex
 		map.window = window;
 		map.col_pos_0 = col_pos_0;
 		map.col_pos_1 = col_pos_1;
-			
+
 		gradientMapStack::Push(map);
 		return map;
 	}
