@@ -10,6 +10,8 @@
 
 #pragma comment(lib, "d3d11.lib")
 
+#define ALLOW_WINDOW_RESIZE FALSE
+
 
 class RenderGUI
 {

@@ -2,6 +2,9 @@
 //#include <render/drawing.h>
 #include "drawing.h"
 
+#include "../encryption/encrypt.h"
+#include "../encryption/PasswordData.h"
+
 #include <files_helper/files.h>
 
 #include <windows.h>
@@ -12,7 +15,8 @@
 static int currentTabId = 0;
 static int nextTabId = currentTabId;
 
-static Animation contentAnim = Animation(Animation::forward, 0.25f);
+static Animation animation_content = Animation(Animation::forward, 0.25f);
+static CPasswordDataManager passwordManager;
 
 template<typename T>
 class MoveFrameForward
@@ -40,20 +44,171 @@ public:
 	};
 };
 
+void RenderLoginPage()
+{
+	ImGuiStyle* style = &ImGui::GetStyle();
+
+	ImVec2 wndSize = ImGui::GetWindowSize();
+	ImVec2 wndPos = ImGui::GetWindowPos();
+	ImVec2 loginChildSize = ImVec2(340, 230);
+	ImVec2 profilesChildSize = ImVec2(240, 430);
+	ImVec2 deltaPos = wndSize - (ImVec2(loginChildSize.x, 0) + profilesChildSize) + style->WindowPadding;
+
+	ImGui::SetNextWindowPos(wndPos + ImVec2(deltaPos.x / 2, deltaPos.y / 2));
+	ImGui::BeginChild("SelectProfileChild", profilesChildSize, 0, ImGuiWindowFlags_AlwaysUseWindowPadding);
+	{
+		ImVec2 center = tools::LocalToGlobalPos(ImGui::GetCursorPos());
+		
+		//ImVec2 btnSize = tools::CalcItemSize("", ImVec2(ImGui::GetWindowWidth() - style->WindowPadding.x * 2, 0));
+		//ImVec2 btnSize = ImVec2(ImGui::GetWindowWidth() - style->WindowPadding.x * 2, ImGui::GetFontSize());
+		ImVec2 btnSize = tools::CalcItemSize("", ImVec2(tools::CalcWindowSpace().x, 0));
+		ImGui::Button("Create new", btnSize);
+		draw::AddPrevButtonEffect(btnSize);
+		static std::string passwordsFolder = manage_files::GetFolder() + "\\passwords";
+		if (!manage_files::folderExists(passwordsFolder) && ImGui::Button("+ create folder"))
+		{
+			manage_files::createDirectory(passwordsFolder);
+		}
+		else
+		{
+			static int selectedFile = -1;
+			static std::vector<std::string> files = manage_files::GetFilesInDirectory(passwordsFolder, true);
+
+			static Animation animationUpdate(9.9f);
+			animationUpdate.Proceed();
+			if (animationUpdate.StartAfter(animationUpdate, Animation::back, Animation::forward))
+			{
+				animationUpdate.SetDuration(1);
+			}
+			if (animationUpdate.AnimationEnded(Animation::forward))
+			{
+				animationUpdate.SetDuration(9.9f);
+				animationUpdate.Start(Animation::back);
+				files = manage_files::GetFilesInDirectory(passwordsFolder, true);
+			}
+			//if (animationUpdate.AnimationEnded(Animation::back))
+			//{
+			//	files = manage_files::GetFilesInDirectory(passwordsFolder, true);
+			//	animationUpdate.ForceDirection(Animation::forward);
+			//}
+			//else if (animationUpdate.AnimationEnded())
+			//{
+			//	animationUpdate.Start(Animation::back);
+			//}
+			
+			ImGui::Text("Update in %.1f sec...", animationUpdate.GetState() != Animation::back ? 0 : animationUpdate.GetValue() * animationUpdate.GetDuration());
+			ImVec2 linePos = tools::LocalToGlobalPos(ImGui::GetCursorPos() + ImVec2(0, 0));
+			ImGui::GetWindowDrawList()->AddRectFilled(linePos, linePos + ImVec2(tools::CalcWindowSpace().x * animationUpdate.GetValueSin(), 2), ImGui::GetColorU32(colors::active), style->WindowRounding);
+			ImGui::SetCursorPosY(ImGui::GetCursorPosY() + style->FramePadding.y);
+			bool needUpdate = false;
+			
+			//static float totalTime = 0;
+			//totalTime += ImGui::GetIO().DeltaTime;
+
+			for (size_t i = 0; i < files.size(); i++)
+			{
+				ImVec2 pos = tools::LocalToGlobalPos(ImGui::GetCursorPos());
+				if (ImGui::Button(files[i].c_str(), btnSize))
+					selectedFile = i;
+				if (selectedFile == i)
+					draw::AddButtonEffectArrow(pos, 0, btnSize);
+			}
+		}
+	}
+	ImGui::EndChild();
+	ImGui::SameLine();
+	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (profilesChildSize.y - loginChildSize.y) / 2);
+	ImGui::BeginChild("LoginChild", loginChildSize, 0, ImGuiWindowFlags_AlwaysUseWindowPadding);
+	{
+		ImGui::Text("Enter your encryption key");
+		ImGui::NewLine();
+
+		static bool visible = false;
+		ImGuiInputTextFlags inputTextFlags = 0;
+		if (!visible) inputTextFlags |= ImGuiInputTextFlags_Password;
+
+		constexpr int maxPassKeyLen = 0x100;
+		static char szKeyBuffer[maxPassKeyLen] = { '\0' };
+		static char szFolderBuffer[maxPassKeyLen] = { '\0' };
+
+		ImGui::InputText("##input_encryption_key", szKeyBuffer, sizeof(szKeyBuffer) / sizeof(*szKeyBuffer), inputTextFlags);
+		ImGui::SameLine();
+		ImGui::Checkbox("<o>##visible", &visible);
+
+		bool isGoodLen = strlen(szKeyBuffer) >= 16;
+		ImGui::Text("[%s] | [%i / %i]", isGoodLen ? "good" : "weak", int(strlen(szKeyBuffer)), maxPassKeyLen - 1);
+
+		if (ImGui::Button("Generate key"))
+		{
+			for (size_t i = 0; i < 0x10; i++)
+			{
+				szKeyBuffer[i] = rand() % 0x5F + 0x20;
+			}
+			szKeyBuffer[0x10] = '\0';
+		}
+		ImGui::NewLine();
+
+		if (ImGui::Button("Decrypt") && isGoodLen)
+		{
+			passwordManager.SetKey(szKeyBuffer);
+			nextTabId = 1;
+			animation_content.Start(Animation::back);
+		}
+
+		ImGui::SameLine();
+		ImGui::Button("Key lost");
+
+		/*
+		ispolzovat kluch vosstanovleniya dlya:
+		key -> decrypt
+		revocation key -> key -> decrypt
+		*/
+	}
+	ImGui::EndChild();
+}
+
+void RenderContentPage()
+{
+	ImGuiStyle* style = &ImGui::GetStyle();
+
+	ImGui::BeginChild("ContentChild", ImVec2(), 0, ImGuiWindowFlags_AlwaysUseWindowPadding);
+	{
+		ImGui::PushStyleColor(ImGuiCol_ChildBg * style->Alpha, colors::darkerAlpha);
+		ImGui::BeginChild("LeftPage", ImVec2(300, 0));
+		{
+			static std::string passwordsFolder = manage_files::GetFolder() + "\\passwords";
+			if (!manage_files::folderExists(passwordsFolder) && ImGui::Button("+ create folder"))
+			{
+				manage_files::createDirectory(passwordsFolder);
+			}
+			else
+			{
+				ImVec2 btnSize = ImVec2(ImGui::GetWindowWidth(), 0);
+				ImGui::Button("+ New file", btnSize);
+				std::vector<std::string> files = manage_files::GetFilesInDirectory(passwordsFolder, true);
+				for (size_t i = 0; i < files.size(); i++)
+				{
+					ImGui::Button(files[i].c_str(), btnSize);
+				}
+			}
+		}
+		ImGui::EndChild();
+		ImGui::PopStyleColor();
+	}
+	ImGui::EndChild();
+}
+
+
 void RenderGUI::RenderBody(const HWND& window)
 {
-	//static MoveFrameForward<bool> mff;
-	//if (mff.Get(3) == true)
-	//	mff.Set(false);
-	//else
-	//	mff.Set(true);
-
-
 	animation_show.Proceed();
 	animation_maximize.Proceed();
+	animation_content.Proceed();
 
-	contentAnim.Proceed();
-	if (contentAnim.StartAfter(contentAnim, Animation::back, Animation::forward))
+	//if (currentTabId != nextTabId)
+	//	animation_content.Start();
+
+	if (animation_content.StartAfter(animation_content, Animation::back, Animation::forward))
 		currentTabId = nextTabId;
 
 	ImGuiStyle* style = &ImGui::GetStyle();
@@ -78,8 +233,11 @@ void RenderGUI::RenderBody(const HWND& window)
 	runCount = clampf(0, 2, runCount);
 	*/
 
-	ImVec2 windowPos = ImLerp(animation_maximize.IsRunning() ? ImVec2(windowPosX, windowPosY) : ImVec2(margin, margin), ImVec2(0, 0), maximizeValue);
-	ImVec2 windowSize = ImLerp(ImVec2(windowWidth, windowHeight), hWndSizeOverride, maximizeValue);
+	ImVec2 windowSize = ImLerp(ImVec2(windowWidth, windowHeight), hWndSizeOverride, minf(maximizeValue * 2, 1));
+	ImVec2 windowPosNormal = animation_maximize.IsRunning() ? ImVec2(windowPosX, windowPosY) : ImVec2(margin, margin);
+	ImVec2 windowPosCenter = (hWndSizeOverride - hWndPosOverride);
+	//ImVec2 windowPos = ImLerp(ImLerp(windowPosNormal, ImVec2(0, 0), maximizeValue), ImLerp(ImVec2(windowPosCenter.x / 2, windowPosCenter.y / 2), ImVec2(0, 0), maximizeValue), maximizeValue);
+	ImVec2 windowPos = ImLerp(windowPosNormal, ImVec2(0, 0), maximizeValue);
 
 	float animationValue = animation_show.GetValueSin();
 	float alpha = Animation::lerp(0, 0.98f, animationValue);
@@ -95,7 +253,7 @@ void RenderGUI::RenderBody(const HWND& window)
 	{
 		// title bar
 		{
-			ImGui::GetWindowDrawList()->AddRectFilled(windowPos, windowPos + ImVec2(windowSize.x, RenderGUI::titleBarHeight), ImGui::GetColorU32(colors::background * colors::darker), style->WindowRounding);
+			ImGui::GetWindowDrawList()->AddRectFilled(windowPos, windowPos + ImVec2(windowSize.x, RenderGUI::titleBarHeight), ImGui::GetColorU32(colors::background * colors::darker * colors::darker), style->WindowRounding);
 
 			const ImVec2 titleBtnSize = ImVec2(30, 30);
 			const ImVec2 injectBtnSz = ImVec2(170, 48);
@@ -108,7 +266,10 @@ void RenderGUI::RenderBody(const HWND& window)
 			ImGui::Text("Password manager");
 			ImGui::SameLine();
 
+#if ALLOW_WINDOW_RESIZE
 			constexpr float titleBarBtnCount = 3;
+#endif
+			constexpr float titleBarBtnCount = 2;
 
 			ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - titleBtnWidth * titleBarBtnCount - style->ItemSpacing.x * maxf(titleBarBtnCount - 1, 1));
 			ImVec2 HidePos = tools::LocalToGlobalPos(ImGui::GetCursorPos());
@@ -121,22 +282,16 @@ void RenderGUI::RenderBody(const HWND& window)
 			}
 			ImGui::SameLine();
 
-			MaximizePos = tools::LocalToGlobalPos(ImGui::GetCursorPos());
 			static MoveFrameForward<bool> isGoingToBig;
+#if ALLOW_WINDOW_RESIZE
+			MaximizePos = tools::LocalToGlobalPos(ImGui::GetCursorPos());
 			if (items::ShadowButton("##maximizeBtn", titleBtnSize) && animation_maximize.AnimationEnded())
 			{
 				animation_maximize.Start();
 				isGoingToBig.Set(animation_maximize.GetState() != Animation::back);
-
-				//ImVec2 posOverride = ImLerp(ImVec2(RenderGUI::windowPosX, RenderGUI::windowPosY), ImVec2(0, 0), animation_maximize.GetState() != Animation::State::back);
-				//ImVec2 sizeOverride = ImLerp(ImVec2(RenderGUI::GetFullWidth(), RenderGUI::GetFullHeight()), ImVec2(1920, 1080), animation_maximize.GetState() != Animation::State::back);
-				//
-				//SetWindowPos(window, NULL,
-				//	posOverride.x, posOverride.y,
-				//	sizeOverride.x, sizeOverride.y,
-				//	SWP_SHOWWINDOW | SWP_NOZORDER);
 			}
 			ImGui::SameLine();
+#endif
 
 			CrossPos = tools::LocalToGlobalPos(ImGui::GetCursorPos());
 			if (items::ShadowButton("##closeBtn", titleBtnSize))
@@ -146,17 +301,10 @@ void RenderGUI::RenderBody(const HWND& window)
 			}
 
 			draw::Underline(ImVec2(HidePos.x + titleBtnWidth / 2, HidePos.y + titleBtnWidth / 2), titleBtnPd, colors::text);
-			draw::CornersMarks(ImVec2(MaximizePos.x + titleBtnWidth / 2, MaximizePos.y + titleBtnWidth / 2), titleBtnPd, -1 * maximizeClamp101, colors::text);
+			//draw::CornersMarks(ImVec2(MaximizePos.x + titleBtnWidth / 2, MaximizePos.y + titleBtnWidth / 2), titleBtnPd, -1 * maximizeClamp101, colors::text);
 			draw::Cross(ImVec2(CrossPos.x + titleBtnWidth / 2, CrossPos.y + titleBtnWidth / 2), titleBtnPd * animation_show.GetValueSin(), colors::text);
 
 			static bool lastTick = animation_maximize.IsRunning();
-			if (animation_maximize.IsRunning() || lastTick)
-			{
-				//SetWindowPos(window, NULL,
-				//	hWndPosOverride.x, hWndPosOverride.y,
-				//	hWndSizeOverride.x, hWndSizeOverride.y,
-				//	SWP_SHOWWINDOW | SWP_NOZORDER);
-			}
 			if (animation_maximize.AnimationEnded() && lastTick || isGoingToBig.Get(1))
 			{
 				ImVec2 posOverride = ImLerp(ImVec2(RenderGUI::windowPosX, RenderGUI::windowPosY), ImVec2(0, 0), animation_maximize.GetState() != Animation::State::back);
@@ -168,55 +316,30 @@ void RenderGUI::RenderBody(const HWND& window)
 					SWP_SHOWWINDOW | SWP_NOZORDER);
 			}
 			lastTick = animation_maximize.IsRunning();
-			ImGui::Text("%.3f", RenderGUI::animation_maximize.GetValue());
+			//ImGui::Text("%.3f", RenderGUI::animation_maximize.GetValue());
 		}
 
 
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, colors::background * colors::darker);
 
-		ImVec2 wndSize = ImGui::GetWindowSize();
-		ImVec2 loginChildSize = ImVec2(340, 230);
-		ImVec2 deltaPos = wndSize - loginChildSize + style->WindowPadding;
-
-		ImGui::SetNextWindowPos(windowPos + ImVec2(deltaPos.x / 2, deltaPos.y / 2));
-		ImGui::BeginChild("LoginChild", loginChildSize, 0, ImGuiWindowFlags_AlwaysUseWindowPadding);
+		ImGui::PushStyleVar(ImGuiStyleVar_Alpha, animationValue * animation_content.GetValueSin());
+		switch (currentTabId)
 		{
-			ImGui::Text("Enter your encryption key");
-			ImGui::NewLine();
+		case 0:
+			RenderLoginPage();
+			break;
 
-			static char szKeyBuffer[MAX_PATH] = { '\0' };
-			ImGui::InputText("##input_encryption_key", szKeyBuffer, sizeof(szKeyBuffer) / sizeof(*szKeyBuffer));
-			//ImGui::SameLine();
+		case 1:
+			RenderContentPage();
+			break;
 
-			if (ImGui::Button("Decrypt"))
-			{
-
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Encrypt"))
-			{
-
-			}
-
-			ImGui::NewLine();
-			ImGui::Button("Key lost");
-			//ImGui::SameLine();
-			//ImGui::Button("Create new file");
-
-			/*
-			ispolzovat kluch vosstanovleniya dlya:
-			key -> decrypt
-			revocation key -> key -> decrypt
-			*/
-
-
+		default:
+			break;
 		}
+		ImGui::PopStyleVar();
 
-		ImGui::EndChild();
 		ImGui::PopStyleColor();
-
-
 		ImGui::PopStyleVar();
 	}
 	ImGui::End();
@@ -455,16 +578,17 @@ void RenderGUI::ResizeRenderTarget()
 		pTarget_view = nullptr;
 	}
 
-	// Resize the swap chain
 	pSwap_chain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0);
 
-	// Create a new render target view
 	ID3D11Texture2D* pBackBuffer = nullptr;
-	pSwap_chain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
+	//pSwap_chain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
+	pSwap_chain->GetBuffer(0U, IID_PPV_ARGS(&pBackBuffer));
+
+	assert(pBackBuffer, "pBackBuffer is equal to 0!");
+
 	pDevice->CreateRenderTargetView(pBackBuffer, nullptr, &pTarget_view);
 	pBackBuffer->Release();
 
-	// Update viewport dimensions
 	D3D11_VIEWPORT vp;
 	vp.Width = static_cast<float>(windowWidth);
 	vp.Height = static_cast<float>(windowHeight);
@@ -473,6 +597,5 @@ void RenderGUI::ResizeRenderTarget()
 	vp.TopLeftX = 0;
 	vp.TopLeftY = 0;
 	pContext->RSSetViewports(1, &vp);
-
 }
 

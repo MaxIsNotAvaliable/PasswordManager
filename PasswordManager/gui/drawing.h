@@ -44,8 +44,9 @@ struct colors
 	static inline const ImVec4 white = ImVec4(1, 1, 1, 1);
 	static inline const ImVec4 black = ImVec4(0, 0, 0, 1);
 	static inline const ImVec4 transparent = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+	static inline const ImVec4 darkerAlpha = ImVec4(0.0f, 0.0f, 0.0f, 0.1f);
 
-	static inline ImVec4 background = ImVec4(0.1f, 0.1f, 0.1f, 1);
+	static inline ImVec4 background = ImVec4(0.13f, 0.13f, 0.13f, 1);
 	static inline ImVec4 backgroundPopUp = ImVec4(0.19f, 0.19f, 0.19f, 1);
 
 	//static inline ImVec4 text = ImVec4(0.83f, 0.83f, 0.83f, 1);
@@ -64,6 +65,13 @@ namespace tools
 		ImVec2 textSz = ImGui::CalcTextSize(text);
 		return ImGui::CalcItemSize(size_arg, textSz.x + style->FramePadding.x * 2.0f, textSz.y + style->FramePadding.y * 2.0f);
 	}
+
+	static ImVec2 CalcWindowSpace()
+	{
+		ImGuiStyle* style = &ImGui::GetStyle();
+		return ImGui::GetWindowSize() - style->WindowPadding * 2;
+	}
+
 
 	static ImVec2 CalcChildSize(ImVec2 size_arg = ImVec2())
 	{
@@ -89,6 +97,49 @@ namespace tools
 
 namespace draw
 {
+	static void AddPrevButtonEffect(ImVec2 buttonSize = ImVec2(0, 0))
+	{
+		buttonSize = tools::CalcItemSize("", buttonSize);
+		
+		ImVec2 beginPos = tools::LocalToGlobalPos(ImGui::GetCursorStartPos());
+		ImGui::GetCursorPos();
+
+		ImVec2 cornersSizeH = ImVec2(5 * ImGui::IsItemHovered(), 0);
+		ImVec2 cornersSizeV = ImVec2(0, 5 * ImGui::IsItemHovered());
+
+		ImGui::GetWindowDrawList()->AddTriangleFilled(beginPos, beginPos + cornersSizeH, beginPos + cornersSizeV, ImGui::GetColorU32(colors::active));
+		ImGui::GetWindowDrawList()->AddTriangleFilled(buttonSize + beginPos, buttonSize + beginPos - cornersSizeH, buttonSize + beginPos - cornersSizeV, ImGui::GetColorU32(colors::active));
+	}
+
+	static void AddButtonEffect(ImVec2 buttonPos, float value, ImVec2 buttonSize = ImVec2(0, 0))
+	{
+		buttonSize = tools::CalcItemSize("", buttonSize);
+
+		ImGui::GetCursorPos();
+
+		ImVec2 cornersSizeH = ImVec2(5 * value, 0);
+		ImVec2 cornersSizeV = ImVec2(0, 5 * value);
+
+		ImGui::GetWindowDrawList()->AddTriangleFilled(buttonPos, buttonPos + cornersSizeH, buttonPos + cornersSizeV, ImGui::GetColorU32(colors::active));
+		ImGui::GetWindowDrawList()->AddTriangleFilled(buttonSize + buttonPos, buttonSize + buttonPos - cornersSizeH, buttonSize + buttonPos - cornersSizeV, ImGui::GetColorU32(colors::active));
+	}
+
+	static void AddButtonEffectArrow(ImVec2 buttonPos, float value, ImVec2 buttonSize = ImVec2(0, 0))
+	{
+		buttonSize = tools::CalcItemSize(0, buttonSize);
+
+		ImGui::GetCursorPos();
+
+		buttonPos = ImVec2(buttonPos.x + buttonSize.y / 2, buttonPos.y + buttonSize.y / 2);
+
+		Vec2 angleV0 = Vec2(5, 0);
+		ImVec2 angleV1 = *(ImVec2*)(&angleV0.Rotate(value));
+		ImVec2 angleV2 = *(ImVec2*)(&angleV0.Rotate(120));
+		ImVec2 angleV3 = *(ImVec2*)(&angleV0.Rotate(120));
+
+		ImGui::GetWindowDrawList()->AddTriangleFilled(buttonPos + angleV1, buttonPos + angleV2, buttonPos + angleV3, ImGui::GetColorU32(colors::active));
+	}
+
 	static void Cross(ImVec2 center, float radius, ImVec4 color = colors::white)
 	{
 		ImGuiWindow* window = ImGui::GetCurrentWindow();

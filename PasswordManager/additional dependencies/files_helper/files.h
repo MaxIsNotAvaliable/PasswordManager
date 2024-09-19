@@ -28,6 +28,30 @@ namespace manage_files
 		return pBuf;
 	}
 
+	static std::vector<std::string> GetFoldersInDirectory(const std::string& path)
+	{
+		std::vector<std::string> folders;
+		for (const auto& entry : std::filesystem::directory_iterator(path)) 
+		{
+			if (std::filesystem::is_directory(entry.status())) 
+			{
+				folders.push_back(entry.path().string());
+			}
+		}
+		return folders;
+	}
+
+	static std::vector<std::string> GetFilesInDirectory(const std::string& path, bool onlyFileName = false)
+	{
+		std::vector<std::string> files;
+		for (const auto& entry : std::filesystem::directory_iterator(path)) 
+		{
+			files.push_back((onlyFileName ? entry.path().filename() : entry.path()).string());
+		}
+		return files;
+	}
+
+
 	static bool fileExists(const std::string& filename)
 	{
 		struct stat buf;
@@ -38,6 +62,11 @@ namespace manage_files
 	{
 		struct stat buf;
 		return (stat(filename.c_str(), &buf) == 0);
+	}
+
+	static bool IsExists(const std::string& path)
+	{
+		return fileExists(path) || folderExists(path);
 	}
 
 	static void createDirectory(const std::string& path)

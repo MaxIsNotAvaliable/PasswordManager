@@ -1170,7 +1170,12 @@ bool ImGui::Checkbox(const char* label, bool* v)
     if (is_visible)
     {
         RenderNavHighlight(total_bb, id);
-        RenderFrame(check_bb.Min, check_bb.Max, GetColorU32((held && hovered) ? ImGuiCol_FrameBgActive : hovered ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg), true, style.FrameRounding);
+        ImVec2 rect_offset = ImVec2(square_sz / 4, square_sz / 4);
+        /*
+        * EDITED
+        */
+        //RenderFrame(check_bb.Min, check_bb.Max, GetColorU32((held && hovered) ? ImGuiCol_FrameBgActive : hovered ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg), true, style.FrameRounding);
+        RenderFrame(check_bb.Min + rect_offset, check_bb.Max - rect_offset, GetColorU32((held && hovered) ? ImGuiCol_FrameBgActive : hovered ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg), true, style.FrameRounding + square_sz);
         ImU32 check_col = GetColorU32(ImGuiCol_CheckMark);
         if (mixed_value)
         {
@@ -1182,7 +1187,12 @@ bool ImGui::Checkbox(const char* label, bool* v)
         else if (*v)
         {
             const float pad = ImMax(1.0f, IM_TRUNC(square_sz / 6.0f));
-            RenderCheckMark(window->DrawList, check_bb.Min + ImVec2(pad, pad), check_col, square_sz - pad * 2.0f);
+            /*
+            * EDITED
+            */
+            //RenderCheckMark(window->DrawList, check_bb.Min + ImVec2(pad, pad), check_col, square_sz - pad * 2.0f);
+            RenderCheckMark(window->DrawList, check_bb.Min + ImVec2(pad * 2, pad * 2), check_col, square_sz - pad * 4.0f);
+            //RenderFrame(check_bb.Min + rect_offset + ImVec2(3, 3), check_bb.Max - rect_offset - ImVec2(3, 3), check_col, true, style.FrameRounding + square_sz);
         }
     }
     const ImVec2 label_pos = ImVec2(check_bb.Max.x + style.ItemInnerSpacing.x, check_bb.Min.y + style.FramePadding.y);

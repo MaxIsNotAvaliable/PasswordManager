@@ -9,6 +9,7 @@
 #include <thread>
 #include <dwmapi.h>
 #include <future>
+#include <windowsx.h>
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -68,12 +69,53 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam)
 	}
 	else if (uMessage == WM_SIZE)
 	{
-		if (wParam != SIZE_MINIMIZED) {
-			// Update the viewport and render target view here
-			// Resize your swap chain and recreate the render target
+		if (wParam != SIZE_MINIMIZED) 
+		{
+			if (RenderGUI::animation_maximize.AnimationEnded(Animation::back))
+			{
+				int width = LOWORD(lParam);
+				int height = HIWORD(lParam);
+
+				RenderGUI::windowWidth = width - RenderGUI::margin * 2;
+				RenderGUI::windowHeight = height - RenderGUI::margin * 2;
+			}
 			RenderGUI::ResizeRenderTarget();
 		}
+	}
+	//else if (uMessage == WM_ENTERSIZEMOVE)
+	//{
+	//
+	//}
+	//else if (uMessage == WM_EXITSIZEMOVE)
+	//{
+	//
+	//}
+	else if (uMessage == WM_NCHITTEST)
+	{
+#if ALLOW_WINDOW_RESIZE
+		if (RenderGUI::animation_maximize.AnimationEnded(Animation::back))
+		{
+			POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+			ScreenToClient(hWnd, &pt);
 
+			RECT rc;
+			GetClientRect(hWnd, &rc);
+
+			// Define resize areas
+			const int resizeAreaSize = 6;
+
+			// Check if we're near the edges
+			if (pt.x - RenderGUI::margin < resizeAreaSize && pt.y - RenderGUI::margin < resizeAreaSize) return HTTOPLEFT;
+			if (pt.x + RenderGUI::margin >= rc.right - resizeAreaSize && pt.y - RenderGUI::margin < resizeAreaSize) return HTTOPRIGHT;
+			if (pt.x - RenderGUI::margin < resizeAreaSize && pt.y + RenderGUI::margin >= rc.bottom - resizeAreaSize) return HTBOTTOMLEFT;
+			if (pt.x + RenderGUI::margin >= rc.right - resizeAreaSize && pt.y + RenderGUI::margin >= rc.bottom - resizeAreaSize) return HTBOTTOMRIGHT;
+			if (pt.x - RenderGUI::margin < resizeAreaSize) return HTLEFT;
+			if (pt.x + RenderGUI::margin >= rc.right - resizeAreaSize) return HTRIGHT;
+			if (pt.y - RenderGUI::margin < resizeAreaSize) return HTTOP;
+			if (pt.y + RenderGUI::margin >= rc.bottom - resizeAreaSize) return HTBOTTOM;
+		}
+#endif
+		return HTCLIENT; // Client area
 	}
 	return DefWindowProcA(hWnd, uMessage, wParam, lParam);
 }
@@ -138,6 +180,7 @@ void InitializeWindow(HINSTANCE hInstance, int nShowCmd)
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
+	srand(time(NULL));
 	auto encryptionWorker = [&]()
 		{
 			while (!finished)
