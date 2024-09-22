@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <vector>
+#include "SHA256.h"
 
 static bool SaveFileEncrypt(std::vector<unsigned char> buffer, const std::string& outputFilePath, const std::vector<unsigned char>& key)
 {
@@ -12,7 +13,7 @@ static bool SaveFileEncrypt(std::vector<unsigned char> buffer, const std::string
     size_t paddedSize = ((originalSize + 15) / 16) * 16;
     buffer.resize(paddedSize);
 
-    AES aes(AESKeyLength::AES_128);
+    AES aes(AESKeyLength::AES_256);
 
     buffer = aes.EncryptECB(buffer, key);
 
@@ -42,7 +43,7 @@ static bool OpenFileEncrypt(std::vector<unsigned char>& outBuffer, const std::st
     outputFile.read(reinterpret_cast<char*>(outBuffer.data()), outBuffer.size());
     outputFile.close();
 
-    AES aes(AESKeyLength::AES_128);
+    AES aes(AESKeyLength::AES_256);
     outBuffer = aes.DecryptECB(outBuffer, key);
     return true;
 }

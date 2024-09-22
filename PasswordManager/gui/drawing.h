@@ -86,9 +86,11 @@ namespace tools
 	}
 
 	// use for drawlist
-	static ImVec2 LocalToGlobalPos(const ImVec2 localPos)
+	static ImVec2 LocalToGlobalPos(ImVec2 localPos, bool countScroll = true)
 	{
 		ImVec2 windowPos = ImGui::GetWindowPos();
+		if (countScroll)
+			localPos = localPos - ImVec2(ImGui::GetScrollX(), ImGui::GetScrollY());
 		return ImVec2(localPos.x + windowPos.x, localPos.y + windowPos.y);
 	}
 }
@@ -454,7 +456,7 @@ namespace items
 		return pressed;
 	}
 
-	bool ShowNotifyLm(const char* title, const char* label, std::function<bool()> fnDesign)
+	bool ShowNotifyLm(const char* title, const char* label, const std::function<bool()>& fnDesign)
 	{
 		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
 		ImGui::SetNextWindowPos(center, 0, ImVec2(0.5f, 0.5f));

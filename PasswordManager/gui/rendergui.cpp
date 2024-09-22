@@ -7,6 +7,8 @@
 
 #include <files_helper/files.h>
 
+#include <byte_data/fonts.h>
+
 #include <windows.h>
 #include <tchar.h>
 #include <stdio.h>
@@ -17,6 +19,7 @@ static int nextTabId = currentTabId;
 
 static Animation animation_content = Animation(Animation::forward, 0.25f);
 static CPasswordDataManager passwordManager;
+static size_t passwordManagerHash = 0;
 
 template<typename T>
 class MoveFrameForward
@@ -44,6 +47,37 @@ public:
 	};
 };
 
+void SetContentPageID(int page)
+{
+	nextTabId = page;
+	animation_content.Start(Animation::back);
+}
+
+int FilterInputTextOnlyPassSymbols(ImGuiInputTextCallbackData* data)
+{
+	ImWchar c = data->EventChar;
+	auto isCharAllowed = [&](char c, const std::string& allowedChars)
+		{
+			for (size_t i = 0; i < allowedChars.size(); i++)
+			{
+				if (allowedChars[i] == c)
+					return true;
+			}
+			return false;
+		};
+
+	if ((c >= 'a' && c <= 'z') ||
+		(c >= 'A' && c <= 'Z') ||
+		(c >= '0' && c <= '9') ||
+		(isCharAllowed(c, "~!@#$%^&*()_+`-=/|\\,.<>?;:\"\'[]{}")))
+	{
+		return 0;
+	}
+
+	return 1;
+};
+
+
 void RenderLoginPage()
 {
 	ImGuiStyle* style = &ImGui::GetStyle();
@@ -54,26 +88,40 @@ void RenderLoginPage()
 	ImVec2 profilesChildSize = ImVec2(240, 430);
 	ImVec2 deltaPos = wndSize - (ImVec2(loginChildSize.x, 0) + profilesChildSize) + style->WindowPadding;
 
+	static int selectedFile = -1;
+	static std::string selectedFileName;
+	static std::string passwordsFolder = manage_files::GetFolder() + "\\passwords";
+	static std::vector<std::string> files = manage_files::GetFilesInDirectory(passwordsFolder, true);
+
 	ImGui::SetNextWindowPos(wndPos + ImVec2(deltaPos.x / 2, deltaPos.y / 2));
 	ImGui::BeginChild("SelectProfileChild", profilesChildSize, 0, ImGuiWindowFlags_AlwaysUseWindowPadding);
 	{
 		ImVec2 center = tools::LocalToGlobalPos(ImGui::GetCursorPos());
-		
+
 		//ImVec2 btnSize = tools::CalcItemSize("", ImVec2(ImGui::GetWindowWidth() - style->WindowPadding.x * 2, 0));
 		//ImVec2 btnSize = ImVec2(ImGui::GetWindowWidth() - style->WindowPadding.x * 2, ImGui::GetFontSize());
+
 		ImVec2 btnSize = tools::CalcItemSize("", ImVec2(tools::CalcWindowSpace().x, 0));
-		ImGui::Button("Create new", btnSize);
-		draw::AddPrevButtonEffect(btnSize);
-		static std::string passwordsFolder = manage_files::GetFolder() + "\\passwords";
+
+
+
+		ImVec2 btnPos = tools::LocalToGlobalPos(ImGui::GetCursorPos());
+		if (ImGui::Button("Create new", btnSize))
+		{
+			selectedFile = -1;
+		}
+		if (selectedFile == -1)
+		{
+			draw::AddPrevButtonEffect(btnSize);
+			draw::AddButtonEffectArrow(btnPos, 0, btnSize);
+		}
+
 		if (!manage_files::folderExists(passwordsFolder) && ImGui::Button("+ create folder"))
 		{
 			manage_files::createDirectory(passwordsFolder);
 		}
 		else
 		{
-			static int selectedFile = -1;
-			static std::vector<std::string> files = manage_files::GetFilesInDirectory(passwordsFolder, true);
-
 			static Animation animationUpdate(9.9f);
 			animationUpdate.Proceed();
 			if (animationUpdate.StartAfter(animationUpdate, Animation::back, Animation::forward))
@@ -95,13 +143,13 @@ void RenderLoginPage()
 			//{
 			//	animationUpdate.Start(Animation::back);
 			//}
-			
+
 			ImGui::Text("Update in %.1f sec...", animationUpdate.GetState() != Animation::back ? 0 : animationUpdate.GetValue() * animationUpdate.GetDuration());
 			ImVec2 linePos = tools::LocalToGlobalPos(ImGui::GetCursorPos() + ImVec2(0, 0));
 			ImGui::GetWindowDrawList()->AddRectFilled(linePos, linePos + ImVec2(tools::CalcWindowSpace().x * animationUpdate.GetValueSin(), 2), ImGui::GetColorU32(colors::active), style->WindowRounding);
 			ImGui::SetCursorPosY(ImGui::GetCursorPosY() + style->FramePadding.y);
 			bool needUpdate = false;
-			
+
 			//static float totalTime = 0;
 			//totalTime += ImGui::GetIO().DeltaTime;
 
@@ -109,9 +157,14 @@ void RenderLoginPage()
 			{
 				ImVec2 pos = tools::LocalToGlobalPos(ImGui::GetCursorPos());
 				if (ImGui::Button(files[i].c_str(), btnSize))
+				{
 					selectedFile = i;
+					selectedFileName = files[i];
+				}
 				if (selectedFile == i)
+				{
 					draw::AddButtonEffectArrow(pos, 0, btnSize);
+				}
 			}
 		}
 	}
@@ -124,45 +177,79 @@ void RenderLoginPage()
 		ImGui::NewLine();
 
 		static bool visible = false;
-		ImGuiInputTextFlags inputTextFlags = 0;
+		ImGuiInputTextFlags inputTextFlags = ImGuiInputTextFlags_CallbackCharFilter | ImGuiInputTextFlags_EnterReturnsTrue;
 		if (!visible) inputTextFlags |= ImGuiInputTextFlags_Password;
 
-		constexpr int maxPassKeyLen = 0x100;
+		constexpr int maxPassKeyLen = 0x21;
 		static char szKeyBuffer[maxPassKeyLen] = { '\0' };
 		static char szFolderBuffer[maxPassKeyLen] = { '\0' };
-
-		ImGui::InputText("##input_encryption_key", szKeyBuffer, sizeof(szKeyBuffer) / sizeof(*szKeyBuffer), inputTextFlags);
+		bool isPressedEnter = false;
+		if (ImGui::InputText("##input_encryption_key", szKeyBuffer, sizeof(szKeyBuffer) / sizeof(*szKeyBuffer), inputTextFlags, FilterInputTextOnlyPassSymbols))
+		{
+			isPressedEnter = true;
+		}
 		ImGui::SameLine();
 		ImGui::Checkbox("<o>##visible", &visible);
 
-		bool isGoodLen = strlen(szKeyBuffer) >= 16;
+		bool isGoodLen = strlen(szKeyBuffer) >= 8;
 		ImGui::Text("[%s] | [%i / %i]", isGoodLen ? "good" : "weak", int(strlen(szKeyBuffer)), maxPassKeyLen - 1);
 
-		if (ImGui::Button("Generate key"))
+		ImGui::NewLine();
+		bool isDisabled = selectedFile == -1;
+
+		if (!isDisabled)
 		{
-			for (size_t i = 0; i < 0x10; i++)
+			ImGui::BeginDisabled();
+			ImGui::Button("Generate key");
+			ImGui::EndDisabled();
+		}
+		else if (ImGui::Button("Generate key"))
+		{
+			for (size_t i = 0; i < maxPassKeyLen; i++)
 			{
 				szKeyBuffer[i] = rand() % 0x5F + 0x20;
+				//szKeyBuffer[i] = 'A' + 0x20;
 			}
-			szKeyBuffer[0x10] = '\0';
-		}
-		ImGui::NewLine();
-
-		if (ImGui::Button("Decrypt") && isGoodLen)
-		{
-			passwordManager.SetKey(szKeyBuffer);
-			nextTabId = 1;
-			animation_content.Start(Animation::back);
+			szKeyBuffer[maxPassKeyLen-1] = '\0';
 		}
 
 		ImGui::SameLine();
-		ImGui::Button("Key lost");
 
-		/*
-		ispolzovat kluch vosstanovleniya dlya:
-		key -> decrypt
-		revocation key -> key -> decrypt
-		*/
+
+
+		if (isDisabled)
+		{
+			ImGui::BeginDisabled();
+			ImGui::Button("Key lost");
+			ImGui::EndDisabled();
+		}
+		else if (ImGui::Button("Key lost"))
+		{
+
+		}
+
+		ImGui::SameLine();
+
+		if (!isGoodLen)
+		{
+			ImGui::BeginDisabled();
+			ImGui::Button("Continue");
+			ImGui::EndDisabled();
+		}
+		else if (ImGui::Button("Continue") || isPressedEnter)
+		{
+			if (isDisabled)
+				selectedFileName = "New file.enc";
+			
+			passwordManager.SetKey(szKeyBuffer);
+			ZeroMemory(szKeyBuffer, sizeof(szKeyBuffer));
+			passwordManager.SetFilename(selectedFileName);
+			if (!isDisabled)
+				passwordManager.DecryptAndOpenData();
+			passwordManagerHash = std::hash<CPasswordDataManager>{}(passwordManager);
+
+			SetContentPageID(1);
+		}
 	}
 	ImGui::EndChild();
 }
@@ -171,26 +258,126 @@ void RenderContentPage()
 {
 	ImGuiStyle* style = &ImGui::GetStyle();
 
+	static char szSaveFilename[MAX_PATH] = { '\0' };
+	static int selectedItem = -1;
+
+	static bool isLastSavePopupOpen = false;
+	bool isGoingToSave = !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId) && ImGui::GetKeyData(ImGuiKey_S)->DownDuration > 0 && ImGui::GetKeyData(ImGuiKey_LeftCtrl)->DownDuration > 0;
+	if (isGoingToSave && !ImGui::IsPopupOpen("File save dialog"))
+	{
+		items::OpenNotify("File save dialog");
+		std::string filename = passwordManager.GetFilename();
+		sprintf_s(szSaveFilename, sizeof(szSaveFilename), filename.c_str());
+	}
+
+	static size_t lastUsedHash = 0;
+	if (lastUsedHash != passwordManagerHash)
+	{
+		lastUsedHash = passwordManagerHash;
+		if (!passwordManager.CheckForStrings())
+		{
+			selectedItem = -1;
+			items::OpenNotify("Data corruption");
+		}
+	}
+
+	std::function<bool()> fnDesign = [&]()
+		{
+			ImGui::Text("Input filename");
+
+			//ImGui::SetWindowFocus();
+			//ImGui::SetKeyboardFocusHere(5);
+			ImGui::InputText("##Input filename", szSaveFilename, sizeof(szSaveFilename), ImGuiInputTextFlags_AutoSelectAll);
+
+			if (ImGui::Button("Cancel##cancelbtnsavepopup") || ImGui::GetKeyData(ImGuiKey_Escape)->Down)
+			{
+				ImGui::CloseCurrentPopup();
+				return false;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Save"))
+			{
+				ImGui::CloseCurrentPopup();
+				return true;
+			}
+			return false;
+		};
+
+	if (items::ShowNotifyLm("File save dialog", "Do you want to save file?", fnDesign))
+	{
+		passwordManager.SetFilename(szSaveFilename);
+		passwordManager.EncryptAndSaveData();
+	}
+
+	isLastSavePopupOpen = ImGui::IsPopupOpen("File save dialog");
+
+	items::ShowNotify("Data corruption", "Data corrupted or invalid key was used to this file!");
+
+	if (ImGui::Button("<<< Back to file list"))
+	{
+		SetContentPageID(0);
+		selectedItem = -1;
+	}
+
 	ImGui::BeginChild("ContentChild", ImVec2(), 0, ImGuiWindowFlags_AlwaysUseWindowPadding);
 	{
-		ImGui::PushStyleColor(ImGuiCol_ChildBg * style->Alpha, colors::darkerAlpha);
-		ImGui::BeginChild("LeftPage", ImVec2(300, 0));
+		auto& passwordList = passwordManager.GetList();
+
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, colors::darkerAlpha);
+		ImGui::BeginChild("LeftPage", ImVec2(300, 0), 0, ImGuiWindowFlags_AlwaysUseWindowPadding);
 		{
-			static std::string passwordsFolder = manage_files::GetFolder() + "\\passwords";
-			if (!manage_files::folderExists(passwordsFolder) && ImGui::Button("+ create folder"))
+			ImVec2 btnSize = tools::CalcItemSize("", ImVec2(tools::CalcWindowSpace().x, 0));
+			ImVec2 btnPos = tools::LocalToGlobalPos(ImGui::GetCursorPos());
+
+			if (ImGui::Button("+ Create new +", btnSize))
 			{
-				manage_files::createDirectory(passwordsFolder);
+				Password_t pwd;
+				pwd.SetTitleName("New");
+				passwordList.push_back(pwd);
 			}
-			else
+			if (ImGui::IsItemHovered())
 			{
-				ImVec2 btnSize = ImVec2(ImGui::GetWindowWidth(), 0);
-				ImGui::Button("+ New file", btnSize);
-				std::vector<std::string> files = manage_files::GetFilesInDirectory(passwordsFolder, true);
-				for (size_t i = 0; i < files.size(); i++)
+				draw::AddPrevButtonEffect(btnSize);
+			}
+			ImGui::Separator();
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, colors::transparent);
+			ImGui::BeginChild("innerListChild");
+			{
+				ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0, 0.5f));
+				ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(20, 0));
+				for (size_t i = 0; i < passwordList.size(); i++)
 				{
-					ImGui::Button(files[i].c_str(), btnSize);
+					btnPos = tools::LocalToGlobalPos(ImGui::GetCursorPos());
+					char btnNameCpy[sizeof(passwordList[i].szTitleName)] = { '\0' };
+					memcpy_s(btnNameCpy, sizeof(btnNameCpy - 1), passwordList[i].szTitleName, sizeof(btnNameCpy - 1));
+					char btnName[sizeof(passwordList[i].szTitleName) * 3] = { '\0' };
+					sprintf_s(btnName, "%s##sbtnid%i", strlen(btnNameCpy) == 0 ? ">> Missing name" : btnNameCpy, int(i));
+					if (ImGui::Button(btnName, btnSize))
+					{
+						selectedItem = selectedItem == i ? -1 : i;
+					}
+					if (selectedItem == i)
+					{
+						draw::AddButtonEffectArrow(btnPos, 0, btnSize);
+					}
 				}
+				ImGui::PopStyleVar(2);
 			}
+			ImGui::EndChild();
+			ImGui::PopStyleColor();
+		}
+		ImGui::EndChild();
+		ImGui::SameLine();
+		ImGui::BeginChild("RightPage", ImVec2(0, 0), 0, ImGuiWindowFlags_AlwaysUseWindowPadding);
+		{
+			if (selectedItem >= 0)
+			{
+				ImGui::InputText("Title name", passwordList[selectedItem].szTitleName, sizeof(passwordList[selectedItem].szTitleName));
+				ImGui::InputText("Account login", passwordList[selectedItem].szLogin, sizeof(passwordList[selectedItem].szLogin));
+				ImGui::InputText("Account password", passwordList[selectedItem].szPassword, sizeof(passwordList[selectedItem].szPassword));
+			}
+
+			//ImGui::InputTextMultiline();
 		}
 		ImGui::EndChild();
 		ImGui::PopStyleColor();
@@ -262,8 +449,10 @@ void RenderGUI::RenderBody(const HWND& window)
 			const float titleBtnPd = titleBtnWidth / 4.5f;
 
 			ImGui::SetCursorPosX(10);
-
-			ImGui::Text("Password manager");
+			//ImGui::Text("Password manager");
+			ImGui::BeginDisabled();
+			ImGui::Button("Password manager##Password manager btn as title bar??? xDDDDDDDD");
+			ImGui::EndDisabled();
 			ImGui::SameLine();
 
 #if ALLOW_WINDOW_RESIZE
@@ -279,7 +468,7 @@ void RenderGUI::RenderBody(const HWND& window)
 			if (items::ShadowButton("##minimizeBtn", titleBtnSize))
 			{
 				animation_show.Start(Animation::back);
-			}
+		}
 			ImGui::SameLine();
 
 			static MoveFrameForward<bool> isGoingToBig;
@@ -317,7 +506,7 @@ void RenderGUI::RenderBody(const HWND& window)
 			}
 			lastTick = animation_maximize.IsRunning();
 			//ImGui::Text("%.3f", RenderGUI::animation_maximize.GetValue());
-		}
+	}
 
 
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
@@ -341,7 +530,7 @@ void RenderGUI::RenderBody(const HWND& window)
 
 		ImGui::PopStyleColor();
 		ImGui::PopStyleVar();
-	}
+}
 	ImGui::End();
 	ImGui::PopStyleVar();
 }
@@ -414,10 +603,18 @@ void RenderGUI::InitializeImGui()
 	ImFontConfig fontConfig;
 	fontConfig.FontDataOwnedByAtlas = false;
 
-	//fonts::regular_14 = io->Fonts->AddFontFromMemoryTTF(ttf_bytes_inter_regular, sizeof(ttf_bytes_inter_regular), 14.f, &fontConfig);
-	//fonts::bold_16 = io->Fonts->AddFontFromMemoryTTF(ttf_bytes_inter_bold, sizeof(ttf_bytes_inter_bold), 16.f, &fontConfig);
-	//fonts::bold_20 = io->Fonts->AddFontFromMemoryTTF(ttf_bytes_inter_bold, sizeof(ttf_bytes_inter_bold), 20.f, &fontConfig);
-	//fonts::bold_28 = io->Fonts->AddFontFromMemoryTTF(ttf_bytes_inter_bold, sizeof(ttf_bytes_inter_bold), 28.f, &fontConfig);
+	static const ImWchar ranges[] =
+	{
+		0x0020, 0x00FF, // Latin
+		0x0400, 0x044F, // Cyrillic
+		0,
+	};
+
+
+	fonts::regular_14 = io->Fonts->AddFontFromMemoryTTF(ttf_bytes_inter_bold, sizeof(ttf_bytes_inter_regular), 14.f, &fontConfig, ranges);
+	fonts::bold_16 = io->Fonts->AddFontFromMemoryTTF(ttf_bytes_inter_bold, sizeof(ttf_bytes_inter_bold), 16.f, &fontConfig, ranges);
+	fonts::bold_20 = io->Fonts->AddFontFromMemoryTTF(ttf_bytes_inter_bold, sizeof(ttf_bytes_inter_bold), 20.f, &fontConfig, ranges);
+	fonts::bold_28 = io->Fonts->AddFontFromMemoryTTF(ttf_bytes_inter_bold, sizeof(ttf_bytes_inter_bold), 28.f, &fontConfig, ranges);
 }
 
 ImVec2 RenderGUI::GetFullSize()
@@ -584,7 +781,7 @@ void RenderGUI::ResizeRenderTarget()
 	//pSwap_chain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
 	pSwap_chain->GetBuffer(0U, IID_PPV_ARGS(&pBackBuffer));
 
-	assert(pBackBuffer, "pBackBuffer is equal to 0!");
+	assert(pBackBuffer);
 
 	pDevice->CreateRenderTargetView(pBackBuffer, nullptr, &pTarget_view);
 	pBackBuffer->Release();
