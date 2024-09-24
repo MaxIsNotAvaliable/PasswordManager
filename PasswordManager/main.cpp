@@ -124,6 +124,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam)
 
 void InitializeWindow(HINSTANCE hInstance, int nShowCmd)
 {
+	srand(time(NULL));
 	const char* class_name = "PasswordManagerClass";
 	const char* window_name = "Password Manager";
 
@@ -182,7 +183,6 @@ void InitializeWindow(HINSTANCE hInstance, int nShowCmd)
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
-	srand(time(NULL));
 	auto encryptionWorker = [&]()
 		{
 			while (!finished)

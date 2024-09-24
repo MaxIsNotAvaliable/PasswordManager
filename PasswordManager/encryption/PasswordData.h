@@ -126,6 +126,8 @@ public:
 	void SetFilename(const std::string& filename)
 	{
 		m_filename = filename;
+		if (!m_filename.ends_with(".enc"))
+			m_filename += ".enc";
 	}
 	std::string GetFilename()
 	{
