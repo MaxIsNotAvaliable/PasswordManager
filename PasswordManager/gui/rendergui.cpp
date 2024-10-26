@@ -311,7 +311,7 @@ void RenderContentPage()
 			if (ImGui::Button("+ Create new +", btnSize))
 			{
 				Password_t pwd;
-				pwd.SetTitleName("New");
+				pwd.SetTitleName("*** New ***");
 				passwordList.push_back(pwd);
 			}
 			if (ImGui::IsItemHovered())
@@ -423,6 +423,7 @@ void RenderContentPage()
 						if (ImGui::Button("Delete this row"))
 						{
 							ImGui::CloseCurrentPopup();
+
 							return true;
 						}
 						return false;

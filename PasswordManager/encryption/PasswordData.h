@@ -70,6 +70,11 @@ struct alignas(0x10) Password_t
 		int result = memcpy_s(dataOut.data(), dataOut.size() * sizeof(*dataOut.data()), (void*)(this), sizeof(Password_t));
 		return dataOut;
 	}
+
+	bool operator<(const Password_t& other)
+	{
+		return strcmp(this->szTitleName, other.szTitleName) < 0; // 
+	}
 };
 
 class CPasswordDataManager
@@ -154,6 +159,8 @@ public:
 
 	std::vector<Password_t>& GetList()
 	{
+		std::sort(m_passwordList.begin(), m_passwordList.end());
+
 		return m_passwordList;
 	}
 
