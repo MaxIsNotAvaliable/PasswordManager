@@ -4,6 +4,7 @@
 #include <files_helper/files.h>
 #include <vector>
 #include <functional>
+#include "SHA256.h"
 
 
 struct alignas(0x10) Password_t

@@ -1,5 +1,4 @@
 #include "renderGui.h"
-//#include <render/drawing.h>
 #include "drawing.h"
 
 #include "../encryption/encrypt.h"
@@ -103,7 +102,7 @@ void RenderLoginPage()
 		ImVec2 btnSize = tools::CalcItemSize("", ImVec2(tools::CalcWindowSpace().x, 0));
 
 		ImVec2 btnPos = tools::LocalToGlobalPos(ImGui::GetCursorPos());
-		if (ImGui::Button("Create new", btnSize))
+		if (ImGui::Button("Use empty", btnSize))
 		{
 			selectedFile = -1;
 		}
@@ -199,18 +198,6 @@ void RenderLoginPage()
 
 		ImGui::SameLine();
 
-
-
-		//if (isDisabled)
-		//{
-		//	ImGui::BeginDisabled();
-		//	ImGui::Button("Key lost");
-		//	ImGui::EndDisabled();
-		//}
-		//else if (ImGui::Button("Key lost")) { }
-
-		ImGui::SameLine();
-
 		if (!isGoodLen)
 		{
 			ImGui::BeginDisabled();
@@ -220,7 +207,7 @@ void RenderLoginPage()
 		else if (ImGui::Button("Continue") || isPressedEnter)
 		{
 			if (isDisabled)
-				selectedFileName = "New file.enc";
+				selectedFileName = manage_files::FindAvailableFilename(passwordsFolder, "New file.enc");
 
 			passwordManager.SetKey(szKeyBuffer);
 
@@ -347,7 +334,6 @@ void RenderContentPage()
 					if (ImGui::Button(btnName, btnSize))
 					{
 						SetChildPage(nextSelectedItem == i ? -1 : i);
-						//selectedItem = selectedItem == i ? -1 : i;
 					}
 					if (selectedItem == i)
 					{
@@ -412,7 +398,7 @@ void RenderContentPage()
 				ImGui::Checkbox("<o>##visiblePass", &visiblePass);
 				ImGui::NewLine();
 
-				ImGui::Text("Additional desctiption");
+				ImGui::Text("Additional description");
 				pushInputStyle();
 				ImGui::InputTextMultiline("##Additional description", passwordList[selectedItem].szDescription, sizeof(passwordList[selectedItem].szDescription));
 				popInputStyle();
@@ -446,7 +432,6 @@ void RenderContentPage()
 				if (items::ShowNotifyLm("Delete", "Do you want to delete account data? \nThere is no way back", fnDeletePopup))
 				{
 					passwordList.erase(passwordList.begin() + selectedItem);
-					//selectedItem = min(selectedItem, int(passwordList.size()) - 1);
 					selectedItem = -1;
 				}
 			}
@@ -509,16 +494,16 @@ void RenderGUI::RenderBody(const HWND& window)
 			const float titleBtnPd = titleBtnWidth / 4.5f;
 
 			ImGui::SetCursorPosX(10);
-			//ImGui::Text("Password manager");
 			ImGui::BeginDisabled();
-			ImGui::Button("Password manager##Password manager btn as title bar??? xDDDDDDDD");
+			ImGui::Button("Password manager##disabled-button-as-title");
 			ImGui::EndDisabled();
 			ImGui::SameLine();
 
 #if ALLOW_WINDOW_RESIZE
 			constexpr float titleBarBtnCount = 3;
-#endif
+#else
 			constexpr float titleBarBtnCount = 2;
+#endif
 
 			ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - titleBtnWidth * titleBarBtnCount - style->ItemSpacing.x * maxf(titleBarBtnCount - 1, 1));
 			ImVec2 HidePos = tools::LocalToGlobalPos(ImGui::GetCursorPos());
@@ -532,6 +517,7 @@ void RenderGUI::RenderBody(const HWND& window)
 			ImGui::SameLine();
 
 			static MoveFrameForward<bool> isGoingToBig;
+
 #if ALLOW_WINDOW_RESIZE
 			MaximizePos = tools::LocalToGlobalPos(ImGui::GetCursorPos());
 			if (items::ShadowButton("##maximizeBtn", titleBtnSize) && animation_maximize.AnimationEnded())
@@ -550,7 +536,6 @@ void RenderGUI::RenderBody(const HWND& window)
 			}
 
 			draw::Underline(ImVec2(HidePos.x + titleBtnWidth / 2, HidePos.y + titleBtnWidth / 2), titleBtnPd, colors::text);
-			//draw::CornersMarks(ImVec2(MaximizePos.x + titleBtnWidth / 2, MaximizePos.y + titleBtnWidth / 2), titleBtnPd, -1 * maximizeClamp101, colors::text);
 			draw::Cross(ImVec2(CrossPos.x + titleBtnWidth / 2, CrossPos.y + titleBtnWidth / 2), titleBtnPd * animation_show.GetValueSin(), colors::text);
 
 			static bool lastTick = animation_maximize.IsRunning();
@@ -653,7 +638,6 @@ void RenderGUI::SetupStyle()
 
 void RenderGUI::InitializeImGui()
 {
-	//std::string dir = manage_files::GetFolder();
 	ImGuiIO* io = &ImGui::GetIO();
 
 	io->IniFilename = NULL;
@@ -837,7 +821,6 @@ void RenderGUI::ResizeRenderTarget()
 	pSwap_chain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0);
 
 	ID3D11Texture2D* pBackBuffer = nullptr;
-	//pSwap_chain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
 	pSwap_chain->GetBuffer(0U, IID_PPV_ARGS(&pBackBuffer));
 
 	assert(pBackBuffer);

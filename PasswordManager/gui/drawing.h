@@ -49,7 +49,6 @@ struct colors
 	static inline ImVec4 background = ImVec4(0.13f, 0.13f, 0.13f, 1);
 	static inline ImVec4 backgroundPopUp = ImVec4(0.19f, 0.19f, 0.19f, 1);
 
-	//static inline ImVec4 text = ImVec4(0.83f, 0.83f, 0.83f, 1);
 	static inline ImVec4 text = ImVec4(1, 1, 1, 1);
 
 	static inline ImVec4 frame = ImVec4(0.16f, 0.16f, 0.16f, 1);
@@ -253,41 +252,12 @@ namespace draw
 
 		// Render
 		const bool is_gradient = bg_color32_1 != bg_color32_2;
-		//if (held || hovered)
-		//{
-		//	// Modify colors (ultimately this can be prebaked in the style)
-		//	float h_increase = (held && hovered) ? 0.02f : 0.02f;
-		//	float v_increase = (held && hovered) ? 0.20f : 0.07f;
 
-		//	ImVec4 bg1f = ImGui::ColorConvertU32ToFloat4(bg_color32_1);
-		//	ImGui::ColorConvertRGBtoHSV(bg1f.x, bg1f.y, bg1f.z, bg1f.x, bg1f.y, bg1f.z);
-		//	bg1f.x = ImMin(bg1f.x + h_increase, 1.0f);
-		//	bg1f.z = ImMin(bg1f.z + v_increase, 1.0f);
-		//	ImGui::ColorConvertHSVtoRGB(bg1f.x, bg1f.y, bg1f.z, bg1f.x, bg1f.y, bg1f.z);
-		//	bg_color32_1 = ImGui::GetColorU32(bg1f);
-		//	if (is_gradient)
-		//	{
-		//		ImVec4 bg2f = ImGui::ColorConvertU32ToFloat4(bg_color32_2);
-		//		ImGui::ColorConvertRGBtoHSV(bg2f.x, bg2f.y, bg2f.z, bg2f.x, bg2f.y, bg2f.z);
-		//		bg2f.z = ImMin(bg2f.z + h_increase, 1.0f);
-		//		bg2f.z = ImMin(bg2f.z + v_increase, 1.0f);
-		//		ImGui::ColorConvertHSVtoRGB(bg2f.x, bg2f.y, bg2f.z, bg2f.x, bg2f.y, bg2f.z);
-		//		bg_color32_2 = ImGui::GetColorU32(bg2f);
-		//	}
-		//	else
-		//	{
-		//		bg_color32_2 = bg_color32_1;
-		//	}
-		//}
-		//ImGui::RenderNavHighlight(bb, id);
-		// ImRotate() method
 		int vert_start_idx = window->DrawList->VtxBuffer.Size;
 		window->DrawList->AddRectFilled(bb.Min, bb.Max, bg_color32_1, g.Style.FrameRounding);
 		int vert_end_idx = window->DrawList->VtxBuffer.Size;
 		if (is_gradient)
 			ImGui::ShadeVertsLinearColorGradientKeepAlpha(window->DrawList, vert_start_idx, vert_end_idx, bb.Min, bb.GetBL(), bg_color32_1, bg_color32_2);
-		/*if (g.Style.FrameBorderSize > 0.0f)
-			window->DrawList->AddRect(bb.Min, bb.Max, ImGui::GetColorU32(ImGuiCol_Border), g.Style.FrameRounding, 0, g.Style.FrameBorderSize);*/
 
 		IMGUI_TEST_ENGINE_ITEM_INFO(id, label, g.LastItemData.StatusFlags);
 		return pressed;
@@ -479,147 +449,6 @@ namespace items
 		ImGui::PopStyleVar();
 		return pressed;
 	}
-
-	static void ShowFileMenu(bool* pOpen)
-	{
-		ImGui::MenuItem("File", NULL, pOpen, false);
-		if (ImGui::MenuItem("New")) {}
-		if (ImGui::MenuItem("Open", "Ctrl+O")) {}
-		if (ImGui::BeginMenu("Open Recent"))
-		{
-			ImGui::MenuItem("fish_hat.c");
-			ImGui::MenuItem("fish_hat.inl");
-			ImGui::MenuItem("fish_hat.h");
-			if (ImGui::BeginMenu("More.."))
-			{
-				ImGui::MenuItem("Hello");
-				ImGui::MenuItem("Sailor");
-				ImGui::EndMenu();
-			}
-			ImGui::EndMenu();
-		}
-		if (ImGui::MenuItem("Save", "Ctrl+S")) {}
-		if (ImGui::MenuItem("Save As..")) {}
-
-		ImGui::Separator();
-		if (ImGui::BeginMenu("Options"))
-		{
-			static bool enabled = true;
-			ImGui::MenuItem("Enabled", "", &enabled);
-			ImGui::BeginChild("child", ImVec2(0, 60), true);
-			for (int i = 0; i < 10; i++)
-				ImGui::Text("Scrolling Text %d", i);
-			ImGui::EndChild();
-			static float f = 0.5f;
-			static int n = 0;
-			ImGui::SliderFloat("Value", &f, 0.0f, 1.0f);
-			ImGui::InputFloat("Input", &f, 0.1f);
-			ImGui::Combo("Combo", &n, "Yes\0No\0Maybe\0\0");
-			ImGui::EndMenu();
-		}
-
-		if (ImGui::BeginMenu("Colors"))
-		{
-			float sz = ImGui::GetTextLineHeight();
-			for (int i = 0; i < ImGuiCol_COUNT; i++)
-			{
-				const char* name = ImGui::GetStyleColorName((ImGuiCol)i);
-				ImVec2 p = ImGui::GetCursorScreenPos();
-				ImGui::GetWindowDrawList()->AddRectFilled(p, ImVec2(p.x + sz, p.y + sz), ImGui::GetColorU32((ImGuiCol)i));
-				ImGui::Dummy(ImVec2(sz, sz));
-				ImGui::SameLine();
-				ImGui::MenuItem(name);
-			}
-			ImGui::EndMenu();
-		}
-
-		if (ImGui::BeginMenu("Options")) // <-- Append!
-		{
-			static bool b = true;
-			ImGui::Checkbox("SomeOption", &b);
-			ImGui::EndMenu();
-		}
-
-		if (ImGui::BeginMenu("Disabled", false)) // Disabled
-		{
-			IM_ASSERT(0);
-		}
-		if (ImGui::MenuItem("Checked", NULL, true)) {}
-		if (ImGui::MenuItem("Quit", "Alt+F4")) {}
-	}
-
-	static void ShowExampleMenuFile(bool* pOpen)
-	{
-		ImGui::MenuItem("(demo menu)", NULL, pOpen, false);
-		if (ImGui::MenuItem("New")) {}
-		if (ImGui::MenuItem("Open", "Ctrl+O")) {}
-		if (ImGui::BeginMenu("Open Recent"))
-		{
-			ImGui::MenuItem("fish_hat.c");
-			ImGui::MenuItem("fish_hat.inl");
-			ImGui::MenuItem("fish_hat.h");
-			if (ImGui::BeginMenu("More.."))
-			{
-				ImGui::MenuItem("Hello");
-				ImGui::MenuItem("Sailor");
-				if (ImGui::BeginMenu("Recurse.."))
-				{
-					ShowExampleMenuFile(pOpen);
-					ImGui::EndMenu();
-				}
-				ImGui::EndMenu();
-			}
-			ImGui::EndMenu();
-		}
-		if (ImGui::MenuItem("Save", "Ctrl+S")) {}
-		if (ImGui::MenuItem("Save As..")) {}
-
-		ImGui::Separator();
-		if (ImGui::BeginMenu("Options"))
-		{
-			static bool enabled = true;
-			ImGui::MenuItem("Enabled", "", &enabled);
-			ImGui::BeginChild("child", ImVec2(0, 60), true);
-			for (int i = 0; i < 10; i++)
-				ImGui::Text("Scrolling Text %d", i);
-			ImGui::EndChild();
-			static float f = 0.5f;
-			static int n = 0;
-			ImGui::SliderFloat("Value", &f, 0.0f, 1.0f);
-			ImGui::InputFloat("Input", &f, 0.1f);
-			ImGui::Combo("Combo", &n, "Yes\0No\0Maybe\0\0");
-			ImGui::EndMenu();
-		}
-
-		if (ImGui::BeginMenu("Colors"))
-		{
-			float sz = ImGui::GetTextLineHeight();
-			for (int i = 0; i < ImGuiCol_COUNT; i++)
-			{
-				const char* name = ImGui::GetStyleColorName((ImGuiCol)i);
-				ImVec2 p = ImGui::GetCursorScreenPos();
-				ImGui::GetWindowDrawList()->AddRectFilled(p, ImVec2(p.x + sz, p.y + sz), ImGui::GetColorU32((ImGuiCol)i));
-				ImGui::Dummy(ImVec2(sz, sz));
-				ImGui::SameLine();
-				ImGui::MenuItem(name);
-			}
-			ImGui::EndMenu();
-		}
-
-		if (ImGui::BeginMenu("Options")) // <-- Append!
-		{
-			static bool b = true;
-			ImGui::Checkbox("SomeOption", &b);
-			ImGui::EndMenu();
-		}
-
-		if (ImGui::BeginMenu("Disabled", false)) // Disabled
-		{
-			IM_ASSERT(0);
-		}
-		if (ImGui::MenuItem("Checked", NULL, true)) {}
-		if (ImGui::MenuItem("Quit", "Alt+F4")) {}
-	}
 }
 
 
@@ -662,46 +491,6 @@ namespace vertex
 			return m;
 		}
 	};
-
-	//static vertex::gradientMap mapBuf;
-
-	// Fills mapBuf with current parameters
-	// 
-	/*static vertex::gradientMap PushGradientMap(const ImVec4& bg_color_1 = ImVec4(1, 1, 1, 1), const ImVec4& bg_color_2 = ImVec4(0, 0, 0, 0), ImVec2 mapSize = ImVec2(1920, 1080), ImVec2 mapOffset = ImVec2(0, 0))
-	{
-		ImGuiWindow* window = ImGui::GetCurrentWindow();
-		if (window->SkipItems)
-			return vertex::gradientMap();
-
-		const ImRect bbScreen(mapOffset, ImVec2(mapSize.x + mapOffset.x, mapSize.y + mapOffset.y));
-
-		int vert_start_idx = window->DrawList->VtxBuffer.Size;
-		vertex::gradientMap map;
-		map.bb = bbScreen;
-		map.color1 = bg_color_1;
-		map.color2 = bg_color_2;
-		map.vert_start_idx = vert_start_idx;
-		map.window = window;
-		gradientMapStack::Push(map);
-		return map;
-	}
-
-	static vertex::gradientMap PushGradientMap(const ImVec4& bg_color_1 = ImVec4(1, 1, 1, 1), const ImVec4& bg_color_2 = ImVec4(0, 0, 0, 0), const ImRect& rectMinMax = ImRect(0, 0, 100, 100))
-	{
-		ImGuiWindow* window = ImGui::GetCurrentWindow();
-		if (window->SkipItems)
-			return vertex::gradientMap();
-
-		int vert_start_idx = window->DrawList->VtxBuffer.Size;
-		vertex::gradientMap map;
-		map.bb = rectMinMax;
-		map.color1 = bg_color_1;
-		map.color2 = bg_color_2;
-		map.vert_start_idx = vert_start_idx;
-		map.window = window;
-		gradientMapStack::Push(map);
-		return map;
-	}*/
 
 	static vertex::gradientMap PushGradientMap(ImVec2 mapStart, ImVec2 mapEnd, const ImVec4& bg_color_1 = ImVec4(1, 1, 1, 1), const ImVec4& bg_color_2 = ImVec4(0, 0, 0, 0), ImVec2 col_pos_0 = ImVec2(0, 0), ImVec2 col_pos_1 = ImVec2(1, 1))
 	{

@@ -51,6 +51,46 @@ namespace manage_files
 		return files;
 	}
 
+	static std::string FindAvailableFilename(const std::string& directory, const std::string& baseFilename)
+	{
+		static auto incFilename = [](const std::filesystem::path& f, int i) -> std::string
+			{
+				return f.stem().string() + std::to_string(i) + f.extension().string();
+			};
+
+		std::filesystem::path filename(baseFilename);
+		auto fileList = GetFilesInDirectory(directory);
+		std::vector<std::string> filtered;
+		for (size_t i = 0; i < fileList.size(); i++)
+		{
+			if (!fileList[i].ends_with(filename.extension().string().c_str()))
+			{
+				continue;
+			}
+
+			filtered.push_back(std::filesystem::path(fileList[i]).filename().string());
+		}
+
+		std::string resultFilename = baseFilename;
+		bool hasSameName = false;
+		int inc = 0;
+		do
+		{
+			hasSameName = false;
+			for (size_t i = 0; i < filtered.size(); i++)
+			{
+				if (filtered[i] == resultFilename)
+				{
+					resultFilename = incFilename(baseFilename, ++inc);
+					hasSameName = true;
+					break;
+				}
+			}
+		} while (hasSameName);
+
+		return resultFilename;
+	}
+
 
 	static bool fileExists(const std::string& filename)
 	{

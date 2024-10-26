@@ -84,14 +84,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam)
 			RenderGUI::ResizeRenderTarget();
 		}
 	}
-	//else if (uMessage == WM_ENTERSIZEMOVE)
-	//{
-	//
-	//}
-	//else if (uMessage == WM_EXITSIZEMOVE)
-	//{
-	//
-	//}
+
 	else if (uMessage == WM_NCHITTEST)
 	{
 #if ALLOW_WINDOW_RESIZE
@@ -183,14 +176,14 @@ void InitializeWindow(HINSTANCE hInstance, int nShowCmd)
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
-	auto encryptionWorker = [&]()
-		{
-			while (!finished)
-			{
+	//auto encryptionWorker = [&]()
+	//	{
+	//		while (!finished)
+	//		{
 
-				std::this_thread::sleep_for(std::chrono::milliseconds(30));
-			}
-		};
+	//			std::this_thread::sleep_for(std::chrono::milliseconds(30));
+	//		}
+	//	};
 
 
 	std::thread thWin(InitializeWindow, hInstance, nShowCmd);
