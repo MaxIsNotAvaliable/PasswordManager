@@ -45,6 +45,7 @@ public:
     float GetValueArc(bool autoProceed = false);
     // return functional value (slow, fast, slow)
     float GetValueSin(bool autoProceed = false);
+    float GetValueInOutSin(bool autoProceed = false);
     // NOT RECOMMEND - return functional value (incr, decr, incr) 
     float GetValueSpring(float k = 2.7f, bool autoProceed = false);
 
@@ -214,6 +215,13 @@ inline float Animation::GetValueSin(bool autoProceed)
     this->GetValue(autoProceed);
     return sinf((this->time - 0.5f) * (atanf(1) * 4)) / 2 + 0.5f;
 }
+
+inline float Animation::GetValueInOutSin(bool autoProceed)
+{
+    this->GetValue(autoProceed);
+    return 0.5f * (1 + sinf(atanf(1) * 4 * (this->time - 0.5f)));
+}
+
 
 inline float Animation::GetValueSpring(float k, bool autoProceed)
 {

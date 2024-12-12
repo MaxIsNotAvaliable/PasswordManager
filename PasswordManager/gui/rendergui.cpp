@@ -190,6 +190,7 @@ void RenderLoginPage()
 		}
 		else if (ImGui::Button("Generate key"))
 		{
+			NotifyManager::AddNotifyToQueue("Key generated!");
 			for (size_t i = 0; i < maxPassKeyLen; i++)
 			{
 				szKeyBuffer[i] = rand() % 0x5F + 0x20;
@@ -475,7 +476,8 @@ void RenderNotifies(const ImVec2& windowSize)
 	{
 		std::string title = std::format("{} {}", notifyList[i].GetTitle(), i);
 
-		float animValue = notifyList.back().animation.GetValue();
+		float animValue = notifyList.back().animation.GetValueInOutSin();
+		animValue = sqrtf(animValue);
 
 		ImVec2 startPos = ImVec2(
 			windowSize.x,
@@ -495,19 +497,18 @@ void RenderNotifies(const ImVec2& windowSize)
 		ImGui::SetNextWindowPos(resPos);
 		ImGui::SetNextWindowSize(winSize);
 		
-		ImGui::SetNextWindowBgAlpha(0.4f * RenderGUI::animation_show.GetValue());
+		ImGui::SetNextWindowBgAlpha(0.4f);
 
 		ImGui::Begin(title.c_str(), 0, windowFlags);
 		{
 			float itemHeight = tools::CalcItemSize("Notify").y;
 			//draw::Pie(ImVec2(resPos.x + itemHeight / 2 + style->ItemSpacing.x, resPos.y + itemHeight / 2 + style->ItemSpacing.y), notifyList[i].GetLifeValue(NotifyManager::maxLifeTime), itemHeight / 4);
-			//draw::primitive::PieDiagram(ImVec2(resPos.x + itemHeight / 2 + style->ItemSpacing.x, resPos.y + itemHeight / 2 + style->ItemSpacing.y), notifyList[i].GetLifeValue(NotifyManager::maxLifeTime), itemHeight / 4, itemHeight / 5);
+			draw::PieDiagram(ImVec2(resPos.x + itemHeight / 2 + style->ItemSpacing.x, resPos.y + itemHeight / 2 + style->ItemSpacing.y), notifyList[i].GetLifeValue(NotifyManager::maxLifeTime), itemHeight / 4, itemHeight / 5);
 			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + itemHeight / 2 + style->ItemSpacing.x * 2);
 			ImGui::TextColored(colors::active, notifyList[i].GetTitle().c_str());
 			ImGui::Text(notifyList[i].GetText().c_str());
 		}
 		ImGui::End();
-		//ImGui::BringWindowToDisplayFront(ImGui::FindWindowByName(title.c_str()));
 
 		ImGui::PopStyleVar(3);
 	}
@@ -546,12 +547,13 @@ void RenderGUI::RenderBody(const HWND& window)
 	float animationValue = animation_show.GetValueSin();
 	float alpha = Animation::lerp(0, 0.98f, animationValue);
 
+	ImGui::PushStyleVar(ImGuiStyleVar_Alpha, animationValue);
 	RenderNotifies(windowSize);
 
 	ImGui::SetNextWindowPos(windowPos);
 	ImGui::SetNextWindowSize(windowSize);
 	ImGui::SetNextWindowBgAlpha(alpha);
-	ImGui::PushStyleVar(ImGuiStyleVar_Alpha, animationValue);
+
 
 	const float fontSize = ImGui::GetFontSize();
 

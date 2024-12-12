@@ -228,6 +228,42 @@ namespace draw
 		}
 	}
 
+	static void PieDiagram(ImVec2 center, float value, float radius = 50, float lineWidth = 20, const char* extraText = 0)
+	{
+		ImGuiWindow* window = ImGui::GetCurrentWindow();
+		if (window->SkipItems)
+			return;
+
+		ImDrawList* drawList = window->DrawList;
+
+		static std::vector<ImVec2> dots;
+		static bool calculated = false;
+		static const float PI = asinf(1) * 2;
+		if (!calculated)
+		{
+			calculated = true;
+			for (float t = -1; t < 1; t += 0.03f)
+			{
+				dots.insert(dots.begin(), ImVec2(sinf(t * PI), cosf(t * PI)));
+			}
+		}
+		std::vector<ImVec2> points = {  };
+		for (size_t i = 0; i < dots.size(); i++)
+		{
+			points.insert(points.end(), ImVec2(dots[i].x * radius + center.x, dots[i].y * radius + center.y));
+		}
+		drawList->AddPolyline(points.data(), (int)(dots.size() * value), ImGui::GetColorU32(colors::white), 0, lineWidth);
+
+		if (extraText)
+		{
+			char arr[32];
+			sprintf_s(arr, "%s %d", extraText, int(value * 100));
+			ImVec2 textSz = ImGui::CalcTextSize(arr);
+			ImVec2 textPs = ImVec2(center.x - textSz.x / 2, center.y - textSz.y / 2);
+			drawList->AddText(textPs, ImGui::GetColorU32(colors::text), arr);
+		}
+	}
+
 	static bool GradientBox(const char* label, const ImVec2 start_pos, const ImVec2 end_pos, ImVec4 bg_color_1, ImVec4 bg_color_2)
 	{
 		ImU32 bg_color32_1 = ImGui::GetColorU32(bg_color_1);
