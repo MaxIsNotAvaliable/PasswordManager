@@ -24,7 +24,7 @@ private:
 	static inline bool running = true;
 	static inline bool initialized = false;
 	static void RenderBody(const HWND& window);
-	static void RenderEffects();
+
 	static void SetupStyle();
 	static void InitializeImGui();
 public:

@@ -1,5 +1,6 @@
 #include "renderGui.h"
 #include "drawing.h"
+#include "notify.h"
 
 #include "../encryption/encrypt.h"
 #include "../encryption/PasswordData.h"
@@ -218,9 +219,11 @@ void RenderLoginPage()
 			if (!passwordManager.CheckForStrings())
 			{
 				items::OpenNotify("Data corruption");
+				NotifyManager::AddNotifyToQueue("Invalid key!", "Encryption");
 			}
 			else
 			{
+				NotifyManager::AddNotifyToQueue("Loading file...", "Encryption");
 				SetContentPageID(1);
 				ZeroMemory(szKeyBuffer, sizeof(szKeyBuffer));
 			}
@@ -380,6 +383,7 @@ void RenderContentPage()
 				if (ImGui::Button("Copy to clipboard##copylogin"))
 				{
 					clipboardxx::clipboard() << passwordList[selectedItem].szLogin;
+					NotifyManager::AddNotifyToQueue("Login copied to clipboard!");
 				}
 				ImGui::SameLine();
 				ImGui::Checkbox("<o>##visibleLogin", &visibleLogin);
@@ -392,6 +396,7 @@ void RenderContentPage()
 				ImGui::SameLine();
 				if (ImGui::Button("Copy to clipboard##copypassword"))
 				{
+					NotifyManager::AddNotifyToQueue("Password copied to clipboard!");
 					clipboardxx::clipboard() << passwordList[selectedItem].szPassword;
 				}
 				ImGui::SameLine();
@@ -443,6 +448,72 @@ void RenderContentPage()
 	ImGui::EndChild();
 }
 
+void RenderNotifies(const ImVec2& windowSize)
+{
+	ImGuiStyle* style = &ImGui::GetStyle();
+	ImGuiWindowFlags windowFlags =
+		ImGuiWindowFlags_NoTitleBar |
+		ImGuiWindowFlags_NoScrollbar |
+		ImGuiWindowFlags_NoResize |
+		//ImGuiWindowFlags_NoFocusOnAppearing |
+		//ImGuiWindowFlags_front
+		ImGuiWindowFlags_NoInputs |
+		ImGuiWindowFlags_AlwaysAutoResize;
+
+	auto CalcItemsHeight = [](int itemAmount)
+		{
+			return tools::CalcItemSize("").y * itemAmount + ImGui::GetStyle().ItemSpacing.y * (itemAmount - 1);
+		};
+
+	ImVec2 winSize = ImVec2(200, CalcItemsHeight(2) + style->WindowPadding.y);
+	float margin = 10;
+
+	std::vector<Notify> notifyList = NotifyManager::GetList();
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, ImVec2());
+
+	for (size_t i = 0; i < notifyList.size(); i++)
+	{
+		std::string title = std::format("{} {}", notifyList[i].GetTitle(), i);
+
+		float animValue = notifyList.back().animation.GetValue();
+
+		ImVec2 startPos = ImVec2(
+			windowSize.x,
+			windowSize.y - margin - Animation::lerp(0.01f, winSize.y, animValue) - (winSize.y + margin) * (notifyList.size() - i - 1)
+		);
+
+		ImVec2 endPos = ImVec2(
+			windowSize.x - margin - winSize.x,
+			windowSize.y - margin - Animation::lerp(0.01f, winSize.y, animValue) - (winSize.y + margin) * (notifyList.size() - i - 1)
+		);
+		ImVec2 resPos = ImLerp(startPos, endPos, notifyList[i].animation.GetValue());
+
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 10));
+
+		ImGui::SetNextWindowPos(resPos);
+		ImGui::SetNextWindowSize(winSize);
+		
+		ImGui::SetNextWindowBgAlpha(0.4f * RenderGUI::animation_show.GetValue());
+
+		ImGui::Begin(title.c_str(), 0, windowFlags);
+		{
+			float itemHeight = tools::CalcItemSize("Notify").y;
+			//draw::Pie(ImVec2(resPos.x + itemHeight / 2 + style->ItemSpacing.x, resPos.y + itemHeight / 2 + style->ItemSpacing.y), notifyList[i].GetLifeValue(NotifyManager::maxLifeTime), itemHeight / 4);
+			//draw::primitive::PieDiagram(ImVec2(resPos.x + itemHeight / 2 + style->ItemSpacing.x, resPos.y + itemHeight / 2 + style->ItemSpacing.y), notifyList[i].GetLifeValue(NotifyManager::maxLifeTime), itemHeight / 4, itemHeight / 5);
+			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + itemHeight / 2 + style->ItemSpacing.x * 2);
+			ImGui::TextColored(colors::active, notifyList[i].GetTitle().c_str());
+			ImGui::Text(notifyList[i].GetText().c_str());
+		}
+		ImGui::End();
+		//ImGui::BringWindowToDisplayFront(ImGui::FindWindowByName(title.c_str()));
+
+		ImGui::PopStyleVar(3);
+	}
+
+	ImGui::PopStyleVar();
+}
 
 void RenderGUI::RenderBody(const HWND& window)
 {
@@ -475,6 +546,8 @@ void RenderGUI::RenderBody(const HWND& window)
 	float animationValue = animation_show.GetValueSin();
 	float alpha = Animation::lerp(0, 0.98f, animationValue);
 
+	RenderNotifies(windowSize);
+
 	ImGui::SetNextWindowPos(windowPos);
 	ImGui::SetNextWindowSize(windowSize);
 	ImGui::SetNextWindowBgAlpha(alpha);
@@ -482,7 +555,19 @@ void RenderGUI::RenderBody(const HWND& window)
 
 	const float fontSize = ImGui::GetFontSize();
 
-	if (ImGui::Begin("Password Manager", &running, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoTitleBar))
+	constexpr ImGuiWindowFlags guiFlags =
+		ImGuiWindowFlags_NoBringToFrontOnFocus |
+		ImGuiWindowFlags_NoFocusOnAppearing |
+		ImGuiWindowFlags_AlwaysAutoResize |
+		ImGuiWindowFlags_NoSavedSettings |
+		ImGuiWindowFlags_NoTitleBar |
+		ImGuiWindowFlags_NoNavFocus |
+		ImGuiWindowFlags_NoResize |
+		ImGuiWindowFlags_NoMove;
+
+	ImGui::BringWindowToDisplayBack(ImGui::FindWindowByName("Password Manager"));
+
+	if (ImGui::Begin("Password Manager", &running, guiFlags))
 	{
 		// title bar
 		{
@@ -576,13 +661,10 @@ void RenderGUI::RenderBody(const HWND& window)
 		ImGui::PopStyleColor();
 		ImGui::PopStyleVar();
 	}
+
 	ImGui::End();
+
 	ImGui::PopStyleVar();
-}
-
-void RenderGUI::RenderEffects()
-{
-
 }
 
 void RenderGUI::SetupStyle()

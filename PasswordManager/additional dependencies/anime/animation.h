@@ -57,7 +57,7 @@ public:
 
     //private:
         // You can set currentTime as you wish.
-    float GetTime();
+    static float GetTime();
 
 private:
     float time = 0;
@@ -254,8 +254,8 @@ inline std::vector<Animation> Animation::InitializeArray(float duration, size_t 
 
 inline float Animation::GetTime()
 {
-    auto start = std::chrono::high_resolution_clock::now();
-    float time = (float)(start.time_since_epoch().count() / 1000) / 1000000.f;
-    return time;
+    auto timeNow = std::chrono::high_resolution_clock::now();
+    float flTime = (float)(timeNow.time_since_epoch().count() / 1000) / 1000000.f;
+    return flTime;
     //return (float)GImGui->Time;
 }
