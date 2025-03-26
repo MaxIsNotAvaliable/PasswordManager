@@ -43,5 +43,6 @@ public:
 	static int GetFullHeight();
 	static bool Initialize(const HWND& window, const WNDCLASSEXA& wc, const int& cmd_show);
 	static bool Running();
+	static void Kill();
 	static void ResizeRenderTarget();
 };

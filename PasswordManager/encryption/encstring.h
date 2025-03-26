@@ -114,7 +114,7 @@ constexpr std::string str_decrypt(const std::array<char, N>& str)
 /// <summary>
 /// <para>Если нужен тип данных std::string - то можно использовать ENCSTR()</para><para>-</para>
 /// При использовании следует передавать туда значения строк, которые определены до компиляции, в ином случае можно использовать
-/// такие методы, как: 
+/// такие методы, как: a
 /// <para>str_encrypt()</para>
 /// <para>str_decrypt()</para>
 /// </summary>
@@ -123,3 +123,6 @@ constexpr std::string str_decrypt(const std::array<char, N>& str)
 //#define ENCCCH(sz) (ENCSTR(sz).c_str())
 
 #endif
+
+#define _xorstr(str) ENCSTR(str)
+

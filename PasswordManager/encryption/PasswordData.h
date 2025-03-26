@@ -14,6 +14,11 @@ struct alignas(0x10) Password_t
 	char szPassword[0x80] = { NULL };
 	char szDescription[0x200] = { NULL };
 
+	int priority = 0;
+	bool favorite = false;
+
+	char reserved[0xD1B] = { NULL };
+
 	void SetTitleName(const std::string& str)
 	{
 		sprintf_s(szTitleName, str.c_str());
@@ -77,11 +82,14 @@ struct alignas(0x10) Password_t
 	}
 };
 
+static_assert (sizeof(Password_t) == 0x1000, "Size is not correct");
+
 class CPasswordDataManager
 {
 private:
 	std::vector<Password_t> m_passwordList;
 	std::string m_key;
+	std::string m_initFileHash;
 	std::string m_filename;
 
 	static inline std::string m_fileFolder = manage_files::GetFolder() + "\\passwords\\";
@@ -135,6 +143,12 @@ public:
 		if (!m_filename.ends_with(".enc"))
 			m_filename += ".enc";
 	}
+	void ClearData()
+	{
+		this->m_filename = "\0";
+		this->m_initFileHash = "\0";
+		this->m_passwordList.clear();
+	}
 	std::string GetFilename()
 	{
 		return m_filename;
@@ -146,20 +160,37 @@ public:
 		std::vector<unsigned char> fileDataBuffer;
 		if (!OpenFileEncrypt(fileDataBuffer, m_fileFolder + m_filename, keyArr))
 			return false;
+
 		ParseData(fileDataBuffer);
+		m_initFileHash = GetOpenFileHash();
+
 		return true;
 	}
+
+	std::string GetOpenFileHash()
+	{
+		SHA256 sha;
+		sha.update((uint8_t*)m_passwordList.data(), m_passwordList.size() * sizeof(Password_t));
+		return SHA256::toString(sha.digest());
+	}
+
+	bool IsFileUpdated()
+	{
+		return m_initFileHash != GetOpenFileHash();
+	}
+
 	bool EncryptAndSaveData()
 	{
 		std::vector<unsigned char> keyArr = GeyKeyData();
 		std::vector<unsigned char> fileDataBuffer;
 		ConvertToByteArray(fileDataBuffer);
+		m_initFileHash = GetOpenFileHash();
 		return SaveFileEncrypt(fileDataBuffer, m_fileFolder + m_filename, keyArr);
 	}
 
 	std::vector<Password_t>& GetList()
 	{
-		std::sort(m_passwordList.begin(), m_passwordList.end());
+		//std::sort(m_passwordList.begin(), m_passwordList.end());
 
 		return m_passwordList;
 	}

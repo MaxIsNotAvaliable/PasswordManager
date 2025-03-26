@@ -21,7 +21,6 @@ static int nextTabId = currentTabId;
 
 static Animation animation_content = Animation(Animation::forward, 0.25f);
 static CPasswordDataManager passwordManager;
-static size_t passwordManagerHash = 0;
 
 template<typename T>
 class MoveFrameForward
@@ -79,7 +78,6 @@ int FilterInputTextOnlyPassSymbols(ImGuiInputTextCallbackData* data)
 	return 1;
 };
 
-
 void RenderLoginPage()
 {
 	ImGuiStyle* style = &ImGui::GetStyle();
@@ -119,7 +117,7 @@ void RenderLoginPage()
 		}
 		else
 		{
-			static Animation animationUpdate(9.9f);
+			static Animation animationUpdate(2.9f);
 			animationUpdate.Proceed();
 			if (animationUpdate.StartAfter(animationUpdate, Animation::back, Animation::forward))
 			{
@@ -127,7 +125,7 @@ void RenderLoginPage()
 			}
 			if (animationUpdate.AnimationEnded(Animation::forward))
 			{
-				animationUpdate.SetDuration(9.9f);
+				animationUpdate.SetDuration(2.9f);
 				animationUpdate.Start(Animation::back);
 				files = manage_files::GetFilesInDirectory(passwordsFolder, true);
 			}
@@ -149,6 +147,20 @@ void RenderLoginPage()
 				if (selectedFile == i)
 				{
 					draw::AddButtonEffectArrow(pos, 0, btnSize);
+				}
+
+				if (ImGui::BeginPopupContextItem(std::format("ContextMenu##file{}", i).c_str()))
+				{
+					if (ImGui::MenuItem("Show in explorer"))
+					{
+						manage_files::openDir(passwordsFolder);
+					}
+					if (ImGui::MenuItem("Open file"))
+					{
+						manage_files::openDir(passwordsFolder + "\\" + files[i]);
+					}
+
+					ImGui::EndPopup();
 				}
 			}
 		}
@@ -211,16 +223,18 @@ void RenderLoginPage()
 			if (isDisabled)
 				selectedFileName = manage_files::FindAvailableFilename(passwordsFolder, "New file.enc");
 
+			passwordManager.GetList().clear();
 			passwordManager.SetKey(szKeyBuffer);
 
 			passwordManager.SetFilename(selectedFileName);
 			if (!isDisabled)
 				passwordManager.DecryptAndOpenData();
-			passwordManagerHash = std::hash<CPasswordDataManager>{}(passwordManager);
+
 			if (!passwordManager.CheckForStrings())
 			{
 				items::OpenNotify("Data corruption");
 				NotifyManager::AddNotifyToQueue("Invalid key!", "Encryption");
+				passwordManager.ClearData();
 			}
 			else
 			{
@@ -243,7 +257,7 @@ void RenderContentPage()
 	static int nextSelectedItem = -1;
 	static int selectedItem = -1;
 
-	static Animation animation_page(0.1f);
+	static Animation animation_page(0.01f);
 	animation_page.Proceed();
 
 	if (animation_page.StartAfter(animation_page, Animation::back, Animation::forward))
@@ -265,27 +279,12 @@ void RenderContentPage()
 		sprintf_s(szSaveFilename, sizeof(szSaveFilename), filename.c_str());
 	}
 
-	std::function<bool()> fnDesign = [&]()
+	int popupResult = items::ShowNotifyLm("File save dialog", "Do you want to save file?", [&]()
 		{
-			ImGui::Text("Input filename");
+			return items::DefaultNotifySave(szSaveFilename, sizeof(szSaveFilename));
+		});
 
-			ImGui::InputText("##Input filename", szSaveFilename, sizeof(szSaveFilename), ImGuiInputTextFlags_AutoSelectAll);
-
-			if (ImGui::Button("Cancel##cancelbtnsavepopup") || ImGui::GetKeyData(ImGuiKey_Escape)->Down)
-			{
-				ImGui::CloseCurrentPopup();
-				return false;
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Save"))
-			{
-				ImGui::CloseCurrentPopup();
-				return true;
-			}
-			return false;
-		};
-
-	if (items::ShowNotifyLm("File save dialog", "Do you want to save file?", fnDesign))
+	if (popupResult == 1)
 	{
 		passwordManager.SetFilename(szSaveFilename);
 		passwordManager.EncryptAndSaveData();
@@ -295,13 +294,64 @@ void RenderContentPage()
 
 	if (ImGui::Button("<<< Back to file list"))
 	{
+		if (!passwordManager.IsFileUpdated())
+		{
+			SetContentPageID(0);
+			selectedItem = -1;
+			passwordManager.ClearData();
+		}
+		else
+		{
+			items::OpenNotify("Save file and go back");
+			std::string filename = passwordManager.GetFilename();
+			sprintf_s(szSaveFilename, sizeof(szSaveFilename), filename.c_str());
+		}
+	}
+
+	int savePopupResult = items::ShowNotifyLm("Save file and go back", "Do you want to save file?", [&]()
+		{
+			return items::DefaultNotifySave(szSaveFilename, sizeof(szSaveFilename));
+		});
+	if (savePopupResult == 1)
+	{
+		passwordManager.SetFilename(szSaveFilename);
+		passwordManager.EncryptAndSaveData();
 		SetContentPageID(0);
 		selectedItem = -1;
+		passwordManager.ClearData();
 	}
+	if (savePopupResult == 2)
+	{
+		SetContentPageID(0);
+		selectedItem = -1;
+		passwordManager.ClearData();
+	}
+
 
 	ImGui::BeginChild("ContentChild", ImVec2(), 0, ImGuiWindowFlags_AlwaysUseWindowPadding);
 	{
 		auto& passwordList = passwordManager.GetList();
+
+		auto SwapItems = [&](int index1, int index2)
+			{
+				if (index1 >= passwordList.size() || index2 >= passwordList.size())
+					return;
+
+				if (nextSelectedItem == index2 || nextSelectedItem != index1)
+					SetChildPage(index2);
+				std::swap(passwordList[index1], passwordList[index2]);
+			};
+
+		auto MoveItemUp = [&](int i)
+			{
+				SwapItems(i, i - 1);
+			};
+
+		auto MoveItemDown = [&](int i)
+			{
+				SwapItems(i, i + 1);
+			};
+
 
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, colors::darkerAlpha);
 		ImGui::BeginChild("LeftPage", ImVec2(300, 0), 0, ImGuiWindowFlags_AlwaysUseWindowPadding);
@@ -317,6 +367,7 @@ void RenderContentPage()
 				Password_t pwd;
 				pwd.SetTitleName("*** New ***");
 				passwordList.push_back(pwd);
+				SetChildPage(int(passwordList.size()) - 1);
 			}
 			if (ImGui::IsItemHovered())
 			{
@@ -331,14 +382,44 @@ void RenderContentPage()
 				for (size_t i = 0; i < passwordList.size(); i++)
 				{
 					btnPos = tools::LocalToGlobalPos(ImGui::GetCursorPos());
-					char btnNameCpy[sizeof(passwordList[i].szTitleName)] = { '\0' };
-					memcpy_s(btnNameCpy, sizeof(btnNameCpy) - 1, passwordList[i].szTitleName, sizeof(btnNameCpy) - 1);
-					char btnName[sizeof(passwordList[i].szTitleName) * 3] = { '\0' };
-					sprintf_s(btnName, "%s##sbtnid%i", strlen(btnNameCpy) == 0 ? ">> Missing name" : btnNameCpy, int(i));
-					if (ImGui::Button(btnName, btnSize))
+					if (ImGui::Button(std::format("{}##sbtnid{}", strlen(passwordList[i].szTitleName) == 0 ? ">> Missing name" : passwordList[i].szTitleName, i).c_str(), btnSize))
 					{
 						SetChildPage(nextSelectedItem == i ? -1 : i);
 					}
+
+					if (ImGui::BeginPopupContextItem(std::format("ContextMenu##{}", i).c_str()))
+					{
+						if (ImGui::MenuItem("Edit"))
+						{
+							SetChildPage(i);
+						}
+
+						if (ImGui::MenuItem("Move Up", nullptr, false, i > 0))
+						{
+							MoveItemUp(i);
+						}
+
+						if (ImGui::MenuItem("Move Down", nullptr, false, i < passwordList.size() - 1))
+						{
+							MoveItemDown(i);
+						}
+
+						//static std::vector<std::string> names = {"-/-/", "/-/-"};
+						//if (ImGui::MenuItem(std::format("{}##emptybtnaboab", names[(time(0) / 2) % 2]).c_str(), nullptr, false, false))
+
+						if (ImGui::MenuItem(std::format("---##emptybtnaboab").c_str(), nullptr, false, false))
+						{
+							//DuplicateItem(i);
+						}
+
+						if (ImGui::MenuItem("Delete", nullptr, false, false))
+						{
+							items::OpenNotify("Delete");
+						}
+
+						ImGui::EndPopup();
+					}
+
 					if (selectedItem == i)
 					{
 						draw::AddButtonEffectArrow(btnPos, 0, btnSize);
@@ -365,15 +446,15 @@ void RenderContentPage()
 					{
 						ImGui::PopStyleColor();
 					};
-				
-				static bool visibleLogin, visiblePass = false;
+
+				static bool visibleLogin = true, visiblePass = false;
 
 				ImGui::Text("Title name");
-				
+
 				pushInputStyle();
 				ImGui::InputText("##Title name", passwordList[selectedItem].szTitleName, sizeof(passwordList[selectedItem].szTitleName));
 				popInputStyle();
-				
+
 				ImGui::NewLine();
 
 				ImGui::Text("Account login");
@@ -414,7 +495,7 @@ void RenderContentPage()
 				{
 					items::OpenNotify("Delete");
 				}
-				
+
 
 				std::function<bool()> fnDeletePopup = [&]()
 					{
@@ -496,7 +577,7 @@ void RenderNotifies(const ImVec2& windowSize)
 
 		ImGui::SetNextWindowPos(resPos);
 		ImGui::SetNextWindowSize(winSize);
-		
+
 		ImGui::SetNextWindowBgAlpha(0.4f);
 
 		ImGui::Begin(title.c_str(), 0, windowFlags);
@@ -521,9 +602,6 @@ void RenderGUI::RenderBody(const HWND& window)
 	animation_show.Proceed();
 	animation_maximize.Proceed();
 	animation_content.Proceed();
-
-	//if (currentTabId != nextTabId)
-	//	animation_content.Start();
 
 	if (animation_content.StartAfter(animation_content, Animation::back, Animation::forward))
 		currentTabId = nextTabId;
@@ -583,7 +661,9 @@ void RenderGUI::RenderBody(const HWND& window)
 
 			ImGui::SetCursorPosX(10);
 			ImGui::BeginDisabled();
-			ImGui::Button("Password manager##disabled-button-as-title");
+			std::string fileNameFormatted = passwordManager.GetFilename().length() > 0 ? " - " + passwordManager.GetFilename() : "";
+			std::string fileUpdated = passwordManager.GetFilename().length() > 0 && passwordManager.IsFileUpdated() ? "*" : "";
+			ImGui::Button(std::format("Password manager{}##disabled-button-as-title", fileNameFormatted + fileUpdated).c_str());
 			ImGui::EndDisabled();
 			ImGui::SameLine();
 
@@ -616,11 +696,36 @@ void RenderGUI::RenderBody(const HWND& window)
 			ImGui::SameLine();
 #endif
 
+			static char szSaveFilename[MAX_PATH] = { '\0' };
 			CrossPos = tools::LocalToGlobalPos(ImGui::GetCursorPos());
 			if (items::ShadowButton("##closeBtn", titleBtnSize))
 			{
-				animation_show.Start(Animation::back);
-				running = false;
+				if (passwordManager.GetList().size() == 0 || !passwordManager.IsFileUpdated())
+				{
+					animation_show.Start(Animation::back);
+					running = false;
+				}
+				else
+				{
+					items::OpenNotify("File save dialog and exit");
+					std::string filename = passwordManager.GetFilename();
+					sprintf_s(szSaveFilename, sizeof(szSaveFilename), filename.c_str());
+				}
+			}
+
+			int popupResult = items::ShowNotifyLm("File save dialog and exit", "Do you want to save file?", [&]() {
+				return items::DefaultNotifySave(szSaveFilename, sizeof(szSaveFilename));
+				});
+
+			if (popupResult == 1)
+			{
+				passwordManager.SetFilename(szSaveFilename);
+				passwordManager.EncryptAndSaveData();
+				RenderGUI::Kill();
+			}
+			if (popupResult == 2)
+			{
+				RenderGUI::Kill();
 			}
 
 			draw::Underline(ImVec2(HidePos.x + titleBtnWidth / 2, HidePos.y + titleBtnWidth / 2), titleBtnPd, colors::text);
@@ -893,6 +998,12 @@ bool RenderGUI::Initialize(const HWND& window, const WNDCLASSEXA& wc, const int&
 bool RenderGUI::Running()
 {
 	return running;
+}
+
+void RenderGUI::Kill()
+{
+	animation_show.Start(Animation::back);
+	running = false;
 }
 
 void RenderGUI::ResizeRenderTarget()

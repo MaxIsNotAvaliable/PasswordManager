@@ -35,6 +35,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam)
 	else if (uMessage == WM_DESTROY)
 	{
 		PostQuitMessage(NULL);
+		RenderGUI::Kill();
 		return 0L;
 	}
 	else if (uMessage == WM_LBUTTONDOWN)

@@ -462,11 +462,11 @@ namespace items
 		return pressed;
 	}
 
-	bool ShowNotifyLm(const char* title, const char* label, const std::function<bool()>& fnDesign)
+	int ShowNotifyLm(const char* title, const char* label, const std::function<int()>& fnDesign)
 	{
 		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
 		ImGui::SetNextWindowPos(center, 0, ImVec2(0.5f, 0.5f));
-		bool pressed = false;
+		int pressed = 0;
 
 		ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 0.1f);
 		if (ImGui::BeginPopupModal(title, NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar))
@@ -484,6 +484,32 @@ namespace items
 		}
 		ImGui::PopStyleVar();
 		return pressed;
+	}
+
+	int DefaultNotifySave(char* buf, size_t buf_size)
+	{
+		ImGui::Text("Input filename");
+
+		ImGui::InputText("##Input filename", buf, buf_size, ImGuiInputTextFlags_AutoSelectAll);
+
+		if (ImGui::Button("Save"))
+		{
+			ImGui::CloseCurrentPopup();
+			return 1;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Don't save"))
+		{
+			ImGui::CloseCurrentPopup();
+			return 2;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel##cancelbtnsavepopup") || ImGui::GetKeyData(ImGuiKey_Escape)->Down)
+		{
+			ImGui::CloseCurrentPopup();
+			return -1;
+		}
+		return 0;
 	}
 }
 

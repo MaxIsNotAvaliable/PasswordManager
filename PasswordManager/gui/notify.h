@@ -48,8 +48,6 @@ inline float Notify::GetLifeValue(float maxLifeTime)
 	return 1 - (Animation::GetTime() - this->spawnTime) / maxLifeTime;
 }
 
-
-
 class NotifyManager
 {
 private:
@@ -67,7 +65,7 @@ public:
 	static void HandleNotifyList();
 	static std::vector<Notify>& GetList();
 	static inline float maxLifeTime = 3;
-	static inline int maxNotifyAmount = 2;
+	static inline int maxNotifyAmount = 4;
 
 private:
 	static inline std::vector<Notify> notifyList;
