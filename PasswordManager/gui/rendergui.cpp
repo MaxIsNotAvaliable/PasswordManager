@@ -254,10 +254,11 @@ void RenderContentPage()
 	ImGuiStyle* style = &ImGui::GetStyle();
 
 	static char szSaveFilename[MAX_PATH] = { '\0' };
+	static int prevSelectedItem = -1;
 	static int nextSelectedItem = -1;
 	static int selectedItem = -1;
 
-	static Animation animation_page(0.01f);
+	static Animation animation_page(0.1f);
 	animation_page.Proceed();
 
 	if (animation_page.StartAfter(animation_page, Animation::back, Animation::forward))
@@ -266,6 +267,7 @@ void RenderContentPage()
 
 	auto SetChildPage = [&](int page)
 		{
+			prevSelectedItem = nextSelectedItem;
 			nextSelectedItem = page;
 			animation_page.Start(Animation::back);
 		};
@@ -361,6 +363,8 @@ void RenderContentPage()
 			if ((btnSize.y + style->ItemSpacing.y) * (passwordList.size() + 1) > tools::CalcWindowSpace().y)
 				btnSize.x -= style->ScrollbarSize;
 			ImVec2 btnPos = tools::LocalToGlobalPos(ImGui::GetCursorPos());
+			ImVec2 currentBtnPos = btnPos;
+			ImVec2 nextBtnPos = btnPos;
 
 			if (ImGui::Button("+ Create new +", btnSize))
 			{
@@ -382,6 +386,17 @@ void RenderContentPage()
 				for (size_t i = 0; i < passwordList.size(); i++)
 				{
 					btnPos = tools::LocalToGlobalPos(ImGui::GetCursorPos());
+
+					if (selectedItem == i)
+					{
+						currentBtnPos = btnPos;
+					}
+					if (nextSelectedItem == i)
+					{
+						nextBtnPos = btnPos;
+					}
+
+
 					if (ImGui::Button(std::format("{}##sbtnid{}", strlen(passwordList[i].szTitleName) == 0 ? ">> Missing name" : passwordList[i].szTitleName, i).c_str(), btnSize))
 					{
 						SetChildPage(nextSelectedItem == i ? -1 : i);
@@ -420,9 +435,10 @@ void RenderContentPage()
 						ImGui::EndPopup();
 					}
 
+
 					if (selectedItem == i)
 					{
-						draw::AddButtonEffectArrow(btnPos, 0, btnSize);
+						draw::AddButtonEffectArrow(btnPos + ImVec2(20, 0) * (animation_page.GetValue() - 1), 0, btnSize);
 					}
 				}
 				ImGui::PopStyleVar(2);
@@ -435,6 +451,13 @@ void RenderContentPage()
 
 		ImGui::BeginChild("RightPage", ImVec2(0, 0), 0, ImGuiWindowFlags_AlwaysUseWindowPadding);
 		{
+			bool useAlpha = (nextSelectedItem == -1 && selectedItem != -1) || (nextSelectedItem != -1 && prevSelectedItem == -1);
+
+			if (useAlpha)
+			{
+				ImGui::PushStyleVar(ImGuiStyleVar_Alpha, animation_page.GetValue());
+			}
+
 			if (selectedItem >= 0)
 			{
 				auto pushInputStyle = [&]()
@@ -447,20 +470,59 @@ void RenderContentPage()
 						ImGui::PopStyleColor();
 					};
 
+
+				auto inputAnimationStyled = [&](const char* label, std::function<char* (int id, size_t& textSize)> getTextFn, ImGuiInputTextFlags extraFlags = 0)
+					{
+						size_t selectedItemSize, nextItemSize;
+						char* currentText = getTextFn(selectedItem, selectedItemSize);
+						if (animation_page.IsRunning() && nextSelectedItem != -1)
+						{
+							char* nextText = getTextFn(nextSelectedItem, nextItemSize);
+							std::string animStr = LerpString(currentText, nextText, 1 - animation_page.GetValue());
+							ImGui::InputText(label, animStr.data(), animStr.size(), ImGuiInputTextFlags_ReadOnly | extraFlags);
+						}
+						else
+						{
+							ImGui::InputText(label, currentText, selectedItemSize, extraFlags);
+						}
+					};
+
+				auto inputMultilineAnimationStyled = [&](const char* label, std::function<char* (int id, size_t& textSize)> getTextFn, ImGuiInputTextFlags extraFlags = 0)
+					{
+						size_t selectedItemSize, nextItemSize;
+						char* currentText = getTextFn(selectedItem, selectedItemSize);
+						if (animation_page.IsRunning() && nextSelectedItem != -1)
+						{
+							char* nextText = getTextFn(nextSelectedItem, nextItemSize);
+							std::string animStr = LerpString(currentText, nextText, 1 - animation_page.GetValue());
+							ImGui::InputTextMultiline(label, animStr.data(), animStr.size(), ImVec2(), ImGuiInputTextFlags_ReadOnly | extraFlags);
+						}
+						else
+						{
+							ImGui::InputTextMultiline(label, currentText, selectedItemSize, ImVec2(), extraFlags);
+						}
+					};
+
+
+
 				static bool visibleLogin = true, visiblePass = false;
 
 				ImGui::Text("Title name");
-
-				pushInputStyle();
-				ImGui::InputText("##Title name", passwordList[selectedItem].szTitleName, sizeof(passwordList[selectedItem].szTitleName));
-				popInputStyle();
+				inputAnimationStyled("##Title name", [&](int id, size_t& textSize)
+					{
+						textSize = sizeof(passwordList[id].szTitleName);
+						return passwordList[id].szTitleName;
+					});
 
 				ImGui::NewLine();
 
 				ImGui::Text("Account login");
-				pushInputStyle();
-				ImGui::InputText("##Account login", passwordList[selectedItem].szLogin, sizeof(passwordList[selectedItem].szLogin), visibleLogin ? 0 : ImGuiInputTextFlags_Password);
-				popInputStyle();
+				inputAnimationStyled("##Account login", [&](int id, size_t& textSize) 
+					{
+						textSize = sizeof(passwordList[id].szLogin); 
+						return passwordList[id].szLogin;
+					}, visibleLogin ? 0 : ImGuiInputTextFlags_Password);
+
 				ImGui::SameLine();
 				if (ImGui::Button("Copy to clipboard##copylogin"))
 				{
@@ -472,9 +534,12 @@ void RenderContentPage()
 				ImGui::NewLine();
 
 				ImGui::Text("Account password");
-				pushInputStyle();
-				ImGui::InputText("##Account password", passwordList[selectedItem].szPassword, sizeof(passwordList[selectedItem].szPassword), visiblePass ? 0 : ImGuiInputTextFlags_Password);
-				popInputStyle();
+				inputAnimationStyled("##Account password", [&](int id, size_t& textSize)
+					{
+						textSize = sizeof(passwordList[id].szPassword);
+						return passwordList[id].szPassword;
+					}, visiblePass ? 0 : ImGuiInputTextFlags_Password);
+
 				ImGui::SameLine();
 				if (ImGui::Button("Copy to clipboard##copypassword"))
 				{
@@ -486,9 +551,11 @@ void RenderContentPage()
 				ImGui::NewLine();
 
 				ImGui::Text("Additional description");
-				pushInputStyle();
-				ImGui::InputTextMultiline("##Additional description", passwordList[selectedItem].szDescription, sizeof(passwordList[selectedItem].szDescription));
-				popInputStyle();
+				inputMultilineAnimationStyled("##Additional description", [&](int id, size_t& textSize) 
+					{
+						textSize = sizeof(passwordList[id].szDescription);
+						return passwordList[id].szDescription;
+					});
 
 				ImGui::SetCursorPosY(ImGui::GetWindowHeight() - tools::CalcItemSize("").y - style->WindowPadding.y);
 				if (ImGui::Button("Delete"))
@@ -523,6 +590,12 @@ void RenderContentPage()
 					selectedItem = -1;
 				}
 			}
+
+			if (useAlpha)
+			{
+				ImGui::PopStyleVar();
+			}
+
 		}
 		ImGui::EndChild();
 		ImGui::PopStyleColor();

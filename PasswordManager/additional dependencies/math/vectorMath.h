@@ -57,6 +57,23 @@ constexpr float clampf(float left, float right, float value)
 	return CLAMP(left, right, value);
 }
 
+static std::string LerpString(const std::string strA, const std::string strB, float t)
+{
+	std::string resultString;
+
+	size_t newSize = lerp(strA.size(), strB.size(), t);
+	resultString.resize(newSize, ' ');
+
+	for (size_t i = 0; i < newSize; i++)
+	{
+		char cA = i >= strA.size() ? ' ' : strA[i];
+		char cB = i >= strB.size() ? ' ' : strB[i];
+		resultString[i] = lerp(cA, cB, t);
+	}
+
+	return resultString;
+}
+
 template <size_t Dimension>
 class Vector
 {

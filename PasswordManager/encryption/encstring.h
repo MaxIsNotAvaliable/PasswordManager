@@ -87,6 +87,38 @@ constexpr std::string str_decrypt(const std::array<char, N>& str)
 	return rc;
 }
 
+
+constexpr std::vector<char> str_encrypt_vec(const char* str, size_t N)
+{
+	std::vector<char> output{};
+	output.resize(N);
+	unsigned char x = 0, c = 0;
+
+	for (int i = 0; i < N; ++i)
+	{
+		c = str[i];
+		char k = GetKey(i);
+		char t1 = (c ^ k);
+		output[i] = t1;
+	}
+	return output;
+}
+
+constexpr std::string str_decrypt_vec(std::vector<char>& str)
+{
+	std::string rc;
+	unsigned char x = 0;
+	for (size_t i = 0; i < str.size(); i++)
+	{
+		char c = str[i];
+		char k = GetKey(i);
+		char v = c ^ k;
+		rc.push_back(v);
+	}
+
+	return rc;
+}
+
 #ifndef _DEBUG
 /// <summary>
 /// При использовании следует передавать туда значения строк, которые определены до компиляции, в ином случае можно использовать
@@ -109,7 +141,7 @@ constexpr std::string str_decrypt(const std::array<char, N>& str)
     }())
 
 #else
-#define ENCSTR(str) (std::string(str).c_str())
+#define ENCSTR(str) (str)
 #endif
 /// <summary>
 /// <para>Если нужен тип данных std::string - то можно использовать ENCSTR()</para><para>-</para>
@@ -125,4 +157,3 @@ constexpr std::string str_decrypt(const std::array<char, N>& str)
 #endif
 
 #define _xorstr(str) ENCSTR(str)
-

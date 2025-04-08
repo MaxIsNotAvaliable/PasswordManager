@@ -92,7 +92,7 @@ private:
 	std::string m_initFileHash;
 	std::string m_filename;
 
-	static inline std::string m_fileFolder = manage_files::GetFolder() + "\\passwords\\";
+	static inline std::string m_fileFolder = manage_files::GetFolder() + ENCSTR("\\passwords\\");
 
 	std::vector<unsigned char> GeyKeyData()
 	{
@@ -140,8 +140,8 @@ public:
 	void SetFilename(const std::string& filename)
 	{
 		m_filename = filename;
-		if (!m_filename.ends_with(".enc"))
-			m_filename += ".enc";
+		if (!m_filename.ends_with(ENCSTR(".enc")))
+			m_filename += ENCSTR(".enc");
 	}
 	void ClearData()
 	{
@@ -190,9 +190,16 @@ public:
 
 	std::vector<Password_t>& GetList()
 	{
-		//std::sort(m_passwordList.begin(), m_passwordList.end());
-
 		return m_passwordList;
+	}
+
+	bool SwapPasswordItems(int index1, int index2)
+	{
+		if (index1 >= m_passwordList.size() || index2 >= m_passwordList.size())
+			return false;
+
+		std::swap(m_passwordList[index1], m_passwordList[index2]);
+		return true;
 	}
 
 	const std::vector<Password_t> GetList() const
@@ -270,17 +277,3 @@ namespace std {
 		}
 	};
 }
-
-//struct VectorHasher {
-//
-//	std::size_t operator()(const std::vector<Password_t>& vec) const 
-//	{
-//		std::size_t h = 0;
-//		for (const auto& item : vec) 
-//		{
-//			h ^= std::hash<Password_t>()(item);
-//		}
-//		return h;
-//	}
-//};
-
